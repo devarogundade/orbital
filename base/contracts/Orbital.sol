@@ -16,8 +16,19 @@ contract Orbital is IOrbital, Ownable2Step {
     using AddressToBytes32 for bytes32;
     using AddressToBytes32 for address;
 
+    /// @notice cross chain method identifier.
+    bytes32 private ON_BORROW_METHOD =
+        0x4f4e5f424f52524f575f4d4554484f4400000000000000000000000000000000;
+    bytes32 private ON_REPAY_METHOD =
+        0x4f4e5f52455041595f4d4554484f440000000000000000000000000000000000;
+    bytes32 private ON_DEFAULT_METHOD =
+        0x4f4e5f44454641554c545f4d4554484f44000000000000000000000000000000;
+
     /// @notice Keeps wormhole dispatches.
     uint32 private _wormholeNonce;
+
+    /// @notice Keeps wormhole nonces execution state.
+    mapping(uint32 => bool) private _executeds;
 
     /// @notice Loan to value ratio.
     uint8 private LTV = 80; // 80 percent
@@ -151,10 +162,38 @@ contract Orbital is IOrbital, Ownable2Step {
         return true;
     }
 
-    /// @notice Thus function receives borrow events from foreign orbitals.
-    function onBorrow(
+    /// @dev Function will be trigger my orbital reyaler.
+    function receiveMessage(
+        uint32 wormholeNonce,
+        bytes32 method,
         bytes memory payload
-    ) external override onlyOwner returns (bool) {
+    ) external override onlyOwner {
+        /// @notice Check if nonce was executed.
+        require(!_executeds[wormholeNonce], "Nonce was already executed.");
+
+        /// @notice Otherwise
+        if (method == ON_BORROW_METHOD) {
+            require(onBorrow(payload));
+        }
+        /// @notice Otherwise
+        else if (method == ON_REPAY_METHOD) {
+            require(onRepay(payload));
+        }
+        /// @notice Otherwise
+        else if (method == ON_DEFAULT_METHOD) {
+            // todo
+        }
+        /// @notice Otherwise
+        else {
+            revert("Undefined method");
+        }
+
+        /// @notice Update nonce as executed.
+        _executeds[wormholeNonce] = true;
+    }
+
+    /// @notice Thus function receives borrow events from foreign orbitals.
+    function onBorrow(bytes memory payload) internal returns (bool) {
         (
             bytes32 loanId,
             bytes32 receiver,
@@ -184,17 +223,14 @@ contract Orbital is IOrbital, Ownable2Step {
         if (tokenType == TokenType.TOKEN || tokenType == TokenType.NFT) {
             return _onBorrow(loanId, tokenOut, receiver, tokenType, value);
         }
-        /// @notice
+        /// @notice Otherwise
         else {
             revert("Undefined method");
         }
     }
 
-    /// @dev Function will be trigger my orbital reyaler.
     /// @notice This function receives repay events from foreign orbitals.
-    function onRepay(
-        bytes memory payload
-    ) external override onlyOwner returns (bool) {
+    function onRepay(bytes memory payload) internal returns (bool) {
         bytes32 loanId = abi.decode(payload, (bytes32));
 
         /// @notice Lookup for loan.
@@ -270,7 +306,7 @@ contract Orbital is IOrbital, Ownable2Step {
             abi.encode(sender, receiver, _wormholeNonce, block.timestamp)
         );
 
-        /// Build inter-chain message.
+        /// @notice Build an inter-chain message.
         bytes memory payload = abi.encode(
             loanId,
             sender.addressToBytes32(),
@@ -282,7 +318,7 @@ contract Orbital is IOrbital, Ownable2Step {
             loan
         );
 
-        /// @notice Publish message on wormhole infra.
+        /// @notice Publish message on wormhole guardian.
         _wormhole.publishMessage{value: wormholeFee}(
             _wormholeNonce,
             payload,

@@ -17,8 +17,8 @@ module.exports = {
   },
   networks: {
     baseSepolia: {
-      url: `https://base-sepolia-rpc.publicnode.com`,
-      chainId: 84532,
+      url: `https://base-goerli.public.blastapi.io`,
+      chainId: 84531,
       accounts: {
         mnemonic: MNEMONIC,
         initialIndex: 0,
@@ -32,10 +32,10 @@ module.exports = {
     customChains: [
       {
         network: 'baseSepolia',
-        chainId: 84532,
+        chainId: 84531,
         urls: {
-          apiURL: 'https://api-sepolia.basescan.org/api',
-          browserURL: 'https://sepolia.basescan.org/',
+          apiURL: 'https://api-goerli.basescan.org/api',
+          browserURL: 'https://goerli.basescan.org/',
         },
       },
     ],

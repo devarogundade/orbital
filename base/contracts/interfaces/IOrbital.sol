@@ -41,7 +41,9 @@ interface IOrbital {
         bytes32 receiver
     ) external payable returns (bytes32);
 
-    function onBorrow(bytes memory payload) external returns (bool);
-
-    function onRepay(bytes memory payload) external returns (bool);
+    function receiveMessage(
+        uint32 wormholeNonce,
+        bytes32 method,
+        bytes memory payload
+    ) external;
 }
