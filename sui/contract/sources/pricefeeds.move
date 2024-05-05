@@ -24,7 +24,7 @@ module contract::pricefeeds {
     
     /// @dev Only owner can call this function.
     /// @notice
-    public fun update_feed_id(coin_id: address, price_id: address, ctx: &mut TxContext) {
+    public entry fun update_feed_id(coin_id: address, price_id: address, ctx: &mut TxContext) {
         assert(ctx.sender() == 1, ENoAccess);
         _price_ids.insert(coin_id, price_id);
     }

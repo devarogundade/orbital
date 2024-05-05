@@ -65,6 +65,7 @@ contract Orbital is IOrbital, Ownable2Step {
         _wormhole = IWormhole(wormhole);
     }
 
+    /// @notice
     function borrow(
         uint16 toChainId,
         bytes32 tokenIn,

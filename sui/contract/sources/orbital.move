@@ -5,27 +5,79 @@ module contract::orbital {
     use sui::object::{Self, UID};
     use sui::transfer::{Self};
     use sui::tx_context::{TxContext};
+    use sui::vec_map::{Self, VecMap};
+    use sui::vec_set::{Self, VecSet};
     use wormhole::emitter::{Self, EmitterCap};
     use wormhole::state::{State as WormholeState};
 
+    friend contract::pricefeeds;
+
+    /// @notice cross chain method identifier.
+    const ON_BORROW_METHOD: vector<u8> =
+        0x4f4e5f424f52524f575f4d4554484f4400000000000000000000000000000000;
+    const ON_REPAY_METHOD: vector<u8> =
+        0x4f4e5f52455041595f4d4554484f440000000000000000000000000000000000;
+    const ON_DEFAULT_METHOD: vector<u8> =
+        0x4f4e5f44454641554c545f4d4554484f44000000000000000000000000000000;
+
+    /// @notice Loan to value ratio.
+    const LTV: u8 = 80; // 80 percent
+
+    /// @notice
+    const TokenTypeTOKEN: u8 = 0;
+
+    /// @notice
+    const TokenTypeNFT: u8 = 1;
+
     struct State has key, store {
         id: UID,
-        emitter_cap: EmitterCap,
+        wormhole_nonce: u32,
+        executeds: VecMap<u32, bool>,
+        orbitals: VecMap<u16, address>,
+        loans: VecMap<vector<u8>, Loan>,
+        foreign_loans: VecMap<vector<u8>, ForeignLoan>,
+        interest_rates: VecMap<address, u64>,
+        supported_tokens: VecSet<address>,
+        supported_nfts: VecSet<address>,
+        owner: address,
+        emitter_cap: EmitterCap
     }
 
-    public fun borrow(
+    fun init(ctx: &mut TxContext) {
+        transfer::share_object(
+            State {
+                id: object::new(ctx),
+                wormhole_nonce: 1,
+                executeds: vec_map::empty(),
+                orbitals: vec_map::empty(),
+                loans: vec_map::empty(),
+                foreign_loans: vec_map::empty(),
+                interest_rates: vec_map::empty(),
+                supported_tokens: ec_set::empty<u8>(),
+                supported_nfts: ec_set::empty<u8>(),
+                owner: ctx.sender(),
+                emitter_cap: emitter::new(wormhole_state, ctx)
+            }
+        );
+    }
+
+    /// @notice
+    public entry fun borrow(
+        state: &mut State,
         to_chain_id: u64,
         coin_in: address,
         coin_out: address,
-        token_type: TokenType,
+        token_type: u8,
         value: u64,
         receiver: address,
         ctx: &mut TxContext
     ): address {
         let sender = ctx.sender();
 
-        if (token_type == TokenType.TOKEN) {
+        /// @notice Take loan with tokens.
+        if (token_type == TokenTypeTOKEN) {
             return borrow_with_tokens(
+                state,
                 sender, 
                 to_chain_id,
                 coin_in,
@@ -35,7 +87,23 @@ module contract::orbital {
                 receiver
             );
         }
-
+        /// @notice Take loan with nft.
+        else if (token_type == TokenTypeNFT) {
+            return borrow_with_nft(
+                state,
+                sender, 
+                to_chain_id,
+                coin_in,
+                coin_out,
+                token_type,
+                value,
+                receiver
+            );
+        }
+        /// @notice Otherwise throw errors.
+        else {
+            abort 0;
+        }
     }
 
     /// @dev Private functions for borrow.
@@ -46,11 +114,12 @@ module contract::orbital {
     
     /// @notice
     fun borrow_with_tokens(
+        state: &mut State,
         sender: address,
         to_chain_id: u64,
         coin_in: address,
         coin_out: address,
-        token_type: TokenType,
+        token_type: u8,
         amouny_in: u64,
         receiver: address
     ): address {
@@ -66,7 +135,7 @@ module contract::orbital {
         );
 
         /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
-        let loan = split_amount(amount_out, LTV);
+        let (loan, _) = split_amount(amount_out, LTV);
 
         /// @notice Get wormhole messgase fee.
         let wormhole_fee = wormhole::wormhole_fee();
@@ -75,24 +144,22 @@ module contract::orbital {
         let from_contract_id = address::this();
 
         /// @notice Get the destination orbital address in bytes32.
-        let to_contract_id = _orbitals[to_chain_id];
+        let to_contract_id = state.orbitals.get(to_chain_id);
 
         /// @notice Construct a unique loan identifier.
-        let loan_id = keccak256(
-            abi.encode(sender, receiver, _wormholeNonce, block.timestamp)
-        );
+        let loan_id: vector<u8> = 0x01;
 
         /// @notice Build an inter-chain message.
-        let payload = abi.encode(
+        let payload = vector[
             loan_id,
-            sender.addressToBytes32(),
+            sender,
             receiver,
-            toChainId,
-            fromContractId,
-            toContractId,
-            tokenOut,
+            to_chain_id,
+            from_contract_id,
+            to_contract_id,
+            coin_out,
             loan
-        );
+        ];
 
         use wormhole::publish_message::{prepare_message, publish_message};
 
@@ -109,15 +176,12 @@ module contract::orbital {
         )
 
         /// @notice Save loan object.
-        transfer::transfer(
-            Loan {
+        state.loans.insert(loan_id, Loan {
 
-            }, 
-            sender
-        );
+        });
 
         /// @notice Update nonce tracker.
-        wormhole_nonce = wormhole_nonce + 1;
+        state.wormhole_nonce = state.wormhole_nonce + 1;
 
         // @notice Return the laon identifier for external systems.
         return loan_id;
