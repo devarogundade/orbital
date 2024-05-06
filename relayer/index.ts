@@ -2,7 +2,7 @@ import * as dotenv from "dotenv";
 import Web3 from 'web3';
 
 import suiOrbitalAbi from "./abis/sui/orbital.json";
-import baseOrbitalAbi from "./abis/base/orbital.json";
+import baseOrbitalAbi from "./abis/ethereum/orbital.json";
 
 dotenv.config();
 
@@ -13,10 +13,10 @@ import {
     StandardRelayerApp,
     StandardRelayerContext,
 } from "@wormhole-foundation/relayer-engine";
-import { CHAIN_ID_SUI, CHAIN_ID_BASE } from "@certusone/wormhole-sdk";
+import { CHAIN_ID_SUI, CHAIN_ID_POLYGON } from "@certusone/wormhole-sdk";
 
 const ORBITAL_SUI = "";
-const ORBITAL_BASE = "";
+const ORBITAL_POLYGON = "";
 
 (async function main() {
     // initialize relayer engine app, pass relevant config options
@@ -27,7 +27,7 @@ const ORBITAL_BASE = "";
             missedVaaOptions: {
                 startingSequenceConfig: {
                     '21': BigInt(1), /* sui */
-                    '30': BigInt(1) /* base */
+                    '5': BigInt(1) /* polygon */
                 }
             }
         },
@@ -38,7 +38,7 @@ const ORBITAL_BASE = "";
     app.multiple(
         {
             [CHAIN_ID_SUI]: `${ORBITAL_SUI}`,
-            [CHAIN_ID_BASE]: `${ORBITAL_BASE}`
+            [CHAIN_ID_POLYGON]: `${ORBITAL_POLYGON}`
         },
         async (ctx, next) => {
             const vaa = ctx.vaa;
@@ -57,7 +57,7 @@ const ORBITAL_BASE = "";
                 console.log('⚡To TxID: ', transactionId);
             }
             // Emitted for base chain
-            else if (vaa?.emitterChain == CHAIN_ID_BASE) {
+            else if (vaa?.emitterChain == CHAIN_ID_POLYGON) {
                 const transactionId = await signTransactionOnSui(
                     vaa.nonce, "METHOD", vaa?.payload.toString('hex')
                 );
@@ -115,9 +115,9 @@ async function signTransactionOnSui(nonce: number, method: string, payload: stri
 }
 
 async function signTransactionOnBase(nonce: number, method: string, payload: string) {
-    const web3 = new Web3('https://base-goerli.public.blastapi.io');
+    const web3 = new Web3('https://polygon-mumbai.gateway.tenderly.co');
 
-    const orbital = new web3.eth.Contract(baseOrbitalAbi as any, ORBITAL_BASE);
+    const orbital = new web3.eth.Contract(baseOrbitalAbi as any, ORBITAL_POLYGON);
 
     // Signing private key.
     const handlerEvmKey = process.env.EVM_PRIVATE_KEY!!;
