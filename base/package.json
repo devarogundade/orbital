@@ -6,7 +6,6 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
-    "@pythnetwork/pyth-sdk-solidity": "^3.1.0",
     "wormhole-solidity-sdk": "^0.0.4"
   }
 }

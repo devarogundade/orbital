@@ -3,30 +3,24 @@ pragma solidity <=0.8.24;
 
 import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
 
-import {IntConversion} from "./libraries/IntConversion.sol";
-
-import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {ISupraSValueFeed} from "./interfaces/ISupraSValueFeed.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract PriceFeeds is IPriceFeeds, Ownable2Step {
-    using IntConversion for int64;
-    using IntConversion for uint64;
-
-    IPyth private _pyth;
+    ISupraSValueFeed private _sValueFeed;
 
     /// @notice
-    mapping(bytes32 => bytes32) private _priceIds;
+    mapping(bytes32 => uint256) private _priceIds;
 
-    constructor(address pyth) Ownable2Step() {
-        _pyth = IPyth(pyth);
+    constructor(address sValueFeed) Ownable2Step() {
+        _sValueFeed = ISupraSValueFeed(sValueFeed);
     }
 
     /// @dev
     function updateFeedId(
         bytes32 tokenId,
-        bytes32 priceId
+        uint256 priceId
     ) external override onlyOwner {
         _priceIds[tokenId] = priceId;
     }
@@ -35,8 +29,10 @@ contract PriceFeeds is IPriceFeeds, Ownable2Step {
     function getPrice(
         bytes32 tokenId
     ) external view override returns (uint256) {
-        PythStructs.Price memory price = _pyth.getPrice(_priceIds[tokenId]);
-        return price.price.int64ToUint64();
+        ISupraSValueFeed.priceFeed memory data = _sValueFeed.getSvalue(
+            _priceIds[tokenId]
+        );
+        return data.price;
     }
 
     /// @notice
@@ -45,10 +41,13 @@ contract PriceFeeds is IPriceFeeds, Ownable2Step {
         bytes32 tokenOut,
         uint256 amountIn
     ) external view override returns (uint256) {
-        PythStructs.Price memory priceIn = _pyth.getPrice(_priceIds[tokenIn]);
-        PythStructs.Price memory priceOut = _pyth.getPrice(_priceIds[tokenOut]);
+        ISupraSValueFeed.priceFeed memory dataIn = _sValueFeed.getSvalue(
+            _priceIds[tokenIn]
+        );
+        ISupraSValueFeed.priceFeed memory dataOut = _sValueFeed.getSvalue(
+            _priceIds[tokenOut]
+        );
 
-        return ((uint256(priceIn.price.int64ToUint64()) * amountIn) /
-            priceOut.price.int64ToUint64());
+        return ((dataIn.price * amountIn) / dataOut.price);
     }
 }
