@@ -6,6 +6,8 @@ import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
 
 import {AddressToBytes32} from "./libraries/AddressToBytes32.sol";
 
+import {Vault} from "./Vault.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -55,14 +57,21 @@ contract Orbital is IOrbital, Ownable2Step {
     /// @notice PriceFeeds - using by pyth network.
     IPriceFeeds private _priceFeeds;
 
+    Vault private _vault;
+
     /// @notice Wormhole deps
     IWormhole private immutable _wormhole;
     uint8 private constant CONSISTENCY_LEVEL = 200;
+
+    ////////////////////////////////
+    ////      CONSTRUCTOR       ////
+    ////////////////////////////////
 
     constructor(address priceFeeds, address wormhole) Ownable2Step() {
         _wormholeNonce = 1;
         _priceFeeds = IPriceFeeds(priceFeeds);
         _wormhole = IWormhole(wormhole);
+        _vault = new Vault();
     }
 
     /// @notice
@@ -155,8 +164,12 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Convert output token to solidity address.
         address tokenOutAddress = loan.tokenOut.bytes32ToAddress();
 
+        /// @notice Extract tokens from sender.
         IERC20 token = IERC20(tokenOutAddress);
         token.transferFrom(sender, address(this), amountIn);
+
+        /// @notice Transfer tokens to vault.
+        token.transfer(address(_vault), amountIn);
 
         loan.state = LoanState.SETTLED;
 
@@ -278,6 +291,9 @@ contract Orbital is IOrbital, Ownable2Step {
         IERC20 token = IERC20(tokenInAddress);
         token.transferFrom(sender, address(this), amountIn);
 
+        /// @notice Transfer tokens to vault.
+        token.transfer(address(_vault), amountIn);
+
         /// @notice Get input amount equivalent of output amount.
         uint256 amountOut = _priceFeeds.estimateFromTo(
             tokenIn,
@@ -362,6 +378,9 @@ contract Orbital is IOrbital, Ownable2Step {
         IERC721 nft = IERC721(tokenInAddress);
         nft.transferFrom(sender, address(this), tokenId);
 
+        /// @notice Transfer tokens to vault.
+        nft.transferFrom(address(this), address(_vault), tokenId);
+
         /// @notice Get input amount equivalent of output amount.
         uint256 amountOut = _priceFeeds.estimateFromTo(
             nftIn,
@@ -445,6 +464,9 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Convert token receiver address to evm address.
         address receiver = loan.sender.bytes32ToAddress();
 
+        /// @notice Withdraw tokens from vault.
+        _vault.transferTokens(tokenInAddress, address(this), loan.value);
+
         /// @notice Transfer back locked tokens to sender.
         IERC20 token = IERC20(tokenInAddress);
         token.transfer(receiver, loan.value);
@@ -466,6 +488,9 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Convert nft receiver address to evm address.
         address receiver = loan.sender.bytes32ToAddress();
+
+        /// @notice Withdraw nft from vault.
+        _vault.transferNft(tokenInAddress, address(this), loan.value);
 
         /// @notice Transfer back locked nft to sender.
         IERC721 nft = IERC721(tokenInAddress);
@@ -490,6 +515,9 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Convert token receiver address to evm address.
         address receiverAddress = receiver.bytes32ToAddress();
+
+        /// @notice Withdraw tokens from vault.
+        _vault.transferTokens(tokenOutAddress, address(this), amount);
 
         /// @notice Transfer tokens to receiver.
         IERC20 token = IERC20(tokenOutAddress);

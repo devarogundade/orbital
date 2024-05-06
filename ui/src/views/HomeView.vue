@@ -25,7 +25,7 @@ const getSwiper = (swiperInstance: SwiperType) => {
               <div class="announcement_content">
                 <h3>Unlock the universe of decentralized finance with Orbital: Your gateway to limitless cross-chain
                   lending.</h3>
-                <p>Built with Wormhole X Pyth Network.</p>
+                <p>Built with Wormhole X Supra.</p>
               </div>
             </div>
           </SwiperSlide>

@@ -29,19 +29,46 @@ module contract::orbital {
     /// @notice
     const TokenTypeNFT: u8 = 1;
 
-    struct State has key, store {
-        id: UID,
-        wormhole_nonce: u32,
-        executeds: VecMap<u32, bool>,
-        orbitals: VecMap<u16, address>,
-        loans: VecMap<vector<u8>, Loan>,
-        foreign_loans: VecMap<vector<u8>, ForeignLoan>,
-        interest_rates: VecMap<address, u64>,
-        supported_tokens: VecSet<address>,
-        supported_nfts: VecSet<address>,
-        owner: address,
-        emitter_cap: EmitterCap
+    ////////////////////////////////
+    ////        STRUCTS         ////
+    ////////////////////////////////
+
+    struct Loan {
+        sender: address;
+        token_type: u8;
+        coin_in: address;
+        value: u64;
+        state: u8;
+        start_secs: u64;
     }
+
+    struct ForeignLoan {
+        sender: receiver;
+        token_type: u8;
+        coin_out: address;
+        value: u64;
+        state: u8;
+        start_secs: u64;
+        interest_rate: u64;
+    }
+
+    struct State has key, store {
+        id: UID;
+        wormhole_nonce: u32;
+        executeds: VecMap<u32, bool>;
+        orbitals: VecMap<u16, address>;
+        loans: VecMap<vector<u8>, Loan>;
+        foreign_loans: VecMap<vector<u8>, ForeignLoan>;
+        interest_rates: VecMap<address, u64>;
+        supported_tokens: VecSet<address>;
+        supported_nfts: VecSet<address>;
+        owner: address;
+        emitter_cap: EmitterCap;
+    }
+
+    ////////////////////////////////
+    ////      CONSTRUCTOR       ////
+    ////////////////////////////////
 
     fun init(ctx: &mut TxContext) {
         transfer::share_object(
@@ -60,6 +87,10 @@ module contract::orbital {
             }
         );
     }
+
+    ////////////////////////////////
+    ////        ENTRIES         ////
+    ////////////////////////////////
 
     /// @notice
     public entry fun borrow(
@@ -124,8 +155,10 @@ module contract::orbital {
         receiver: address
     ): address {
         /// @notice Check if the token is supported.
-        
+        assert!(is_token_supported(state.supported_tokens, coin_in), 0);
+
         /// @notice Extract tokens from sender.
+        transfer::public_transfer(coin_in_contract, sender);
 
         /// @notice Get input amount equivalent of output amount.
         let amount_out = pricefeeds::estimate_from_to(
@@ -185,6 +218,20 @@ module contract::orbital {
 
         // @notice Return the laon identifier for external systems.
         return loan_id;
+    }
+
+
+    fun is_token_supported(supported_tokens: vector<address>, coin_id: address): bool {
+        let mut index = 0;
+
+        while (index < supported_tokens.lenght()) {
+            if (supported_tokens[index] == coin_id) {
+                return true;
+            }
+            index = index + 1;
+        }
+        
+        false
     }
 }
 
