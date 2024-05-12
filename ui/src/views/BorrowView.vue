@@ -5,10 +5,6 @@
   <section>
     <div class="app_width">
       <div class="base_container">
-        <div class="table_container">
-
-        </div>
-
         <div class="borrow_container">
           <div class="borrow">
             <div class="collateral">
@@ -50,6 +46,14 @@
           <div class="borrow">
             <div class="principal">
               <div class="from_chain">
+                <p>Loan-To-Vlalue:</p>
+                <div class="chain">
+                  <!-- <img src="/images/sui.png" alt=""> -->
+                  <p>80%</p>
+                </div>
+              </div>
+
+              <div class="from_chain">
                 <p>Destination:</p>
                 <div class="chain">
                   <img src="/images/sui.png" alt="">
@@ -79,6 +83,54 @@
             <div class="action">
               <button>Approve ETH</button>
             </div>
+          </div>
+        </div>
+
+        <div class="table_container">
+          <h3>Open loans</h3>
+          <div class="open_loans">
+            <table>
+              <thead>
+                <tr>
+                  <td>#</td>
+                  <td>Collateral</td>
+                  <td>Principal</td>
+                  <td>Action</td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="index in 5" :key="index">
+                  <td>{{ index }}</td>
+                  <td>
+                    <div class="table_collateral">
+                      <div class="token">
+                        <img src="/images/eth.png" alt="">
+                        <p>ETH</p>
+                      </div>
+                      <div class="chain">
+                        <img src="/images/base.png" alt="">
+                        <p>Polygon</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="table_principal">
+                      <div class="token">
+                        <img src="/images/eth.png" alt="">
+                        <p>ETH</p>
+                      </div>
+                      <div class="chain">
+                        <img src="/images/base.png" alt="">
+                        <p>Polygon</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <button>Repay</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -176,23 +228,23 @@ section {
   color: var(--tx-dimmed);
 }
 
-.chain {
-  padding: 0 12px;
+.borrow_container .chain {
+  padding: 0 10px;
   background: var(--background-light);
   border-radius: 24px;
   height: 30px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
-.chain p {
+.borrow_container .chain p {
   font-size: 14px;
   font-weight: 500;
   color: var(--tx-normal);
 }
 
-.chain img {
+.borrow_container .chain img {
   width: 20px;
   height: 20px;
   border-radius: 10px;
@@ -230,8 +282,7 @@ input {
   width: 100%;
 }
 
-.token {
-  border-left: 1px solid var(--background-lighter);
+.borrow_container .token {
   padding: 0 16px;
   height: 100%;
   display: flex;
@@ -239,13 +290,13 @@ input {
   gap: 10px;
 }
 
-.token p {
+.borrow_container .token p {
   font-size: 14px;
   font-weight: 500;
   color: var(--tx-normal);
 }
 
-.token img {
+.borrow_container .token img {
   width: 20px;
   height: 20px;
   border-radius: 10px;
@@ -320,10 +371,98 @@ input {
   color: var(--tx-normal);
 }
 
-.table_container {
-  width: 400px;
-  min-height: 591px;
+.table_container {}
+
+.table_container>h3 {
+  color: var(--tx-normal);
+  font-size: 24px;
+}
+
+.open_loans {
+  width: 450px;
   border-radius: 16px;
   background: var(--background-lighter);
+  margin-top: 16px;
+}
+
+table {
+  width: 100%;
+}
+
+thead {
+  height: 60px;
+}
+
+thead td,
+tbody td {
+  color: var(--tx-normal);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+td {
+  padding: 0 16px;
+}
+
+.table_collateral {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+td button {
+  height: 35px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--primary);
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+}
+
+.table_container .token {
+  padding: 0 6px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table_container .token p {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tx-normal);
+}
+
+.table_container .token img {
+  width: 16px;
+  height: 16px;
+  border-radius: 10px;
+}
+
+.table_container .chain {
+  padding: 0 6px;
+  background: var(--background-light);
+  border-radius: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table_container .chain p {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tx-normal);
+}
+
+.table_container .chain img {
+  width: 16px;
+  height: 16px;
+  border-radius: 10px;
+}
+
+tbody tr {
+  height: 70px;
 }
 </style>

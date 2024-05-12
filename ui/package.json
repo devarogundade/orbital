@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "swiper": "^11.1.1",
+    "viem": "^2.10.3",
     "vue": "^3.4.21",
-    "vue-router": "^4.3.0"
+    "vue-router": "^4.3.0",
+    "wagmi": "^2.8.6"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",

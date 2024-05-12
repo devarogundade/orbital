@@ -589,6 +589,7 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice interestRate is in basis points (0.01%)
         uint256 interest = (value * interestRate * duration) /
             (100 * 365 days * 24 * 60 * 60);
+
         return interest;
     }
 }
