@@ -1,0 +1,12 @@
+[package]
+name = "faucet"
+edition = "2024.beta"
+published-at = "0xa3c203f213dff4cada8040c5f7a062faa1def59a90455bb5b38b9b02a9b4727d"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+faucet = "0xa3c203f213dff4cada8040c5f7a062faa1def59a90455bb5b38b9b02a9b4727d"
+
+[dev-addresses]

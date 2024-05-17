@@ -1,14 +1,14 @@
 [package]
-name = "price_feeds"
+name = "supra"
 edition = "2024.beta"
-published-at = "0x30de9bdcacaad2ee83f91427898b32235385ba38bf1e6623c01b2cc39c699976"
+published-at = "0xb2133239f65654e65eba7432ed0a5364a2e8a842282fe4aa19daf1132959628b"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
-supra = { local = "../supra" }
 
 [addresses]
-price_feeds = "0x30de9bdcacaad2ee83f91427898b32235385ba38bf1e6623c01b2cc39c699976"
+sui = "0x2"
+supra = "0xb2133239f65654e65eba7432ed0a5364a2e8a842282fe4aa19daf1132959628b"
 
 [dev-dependencies]
 

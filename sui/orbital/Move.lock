@@ -2,25 +2,18 @@
 
 [move]
 version = 2
-manifest_digest = "8D5435DEF4E85FAB70C8FA4F76FD0C8E8CC770FF20C443B708FA5AB1EE398561"
-deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
+manifest_digest = "B1AF4F7ADEF283DB86C3FECCA2666E9EF467D764EAFBD70FD1DBCA7FD726C4D4"
+deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
 dependencies = [
-  { name = "PriceFeeds" },
   { name = "Sui" },
   { name = "Wormhole" },
+  { name = "price_feeds" },
+  { name = "supra" },
 ]
 
 [[move.package]]
 name = "MoveStdlib"
 source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/testnet", subdir = "crates/sui-framework/packages/move-stdlib" }
-
-[[move.package]]
-name = "PriceFeeds"
-source = { local = "../price_feeds" }
-
-dependencies = [
-  { name = "Sui" },
-]
 
 [[move.package]]
 name = "Sui"
@@ -37,3 +30,25 @@ source = { local = "../wormhole" }
 dependencies = [
   { name = "Sui" },
 ]
+
+[[move.package]]
+name = "price_feeds"
+source = { local = "../price_feeds" }
+
+dependencies = [
+  { name = "Sui" },
+  { name = "supra" },
+]
+
+[[move.package]]
+name = "supra"
+source = { local = "../supra" }
+
+dependencies = [
+  { name = "Sui" },
+]
+
+[move.toolchain-version]
+compiler-version = "1.24.0"
+edition = "2024.beta"
+flavor = "sui"
