@@ -1,4 +1,4 @@
-module price_feeds::main {
+module orbital::price_feeds {
     use sui::object::UID;
     use sui::vec_map::{Self, VecMap};
     use supra::SupraSValueFeed::{get_price as get_oracle_price, OracleHolder};

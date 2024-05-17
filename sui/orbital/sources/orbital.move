@@ -13,7 +13,6 @@ module orbital::orbital {
 
     /// @dev price feeds deps
     use supra::SupraSValueFeed::{OracleHolder};
-    use price_feeds::main::{get_price, estimate_from_to, State as SupraState};
 
     /// @dev wormhole deps
     use wormhole::bytes::{Self};
@@ -21,12 +20,16 @@ module orbital::orbital {
     use wormhole::state::{State as WormholeState, message_fee};
     use wormhole::publish_message::{prepare_message, publish_message};
 
+    use orbital::vault;
     use orbital::coin_utils::{take_balance};
+    use orbital::price_feeds::{get_price, estimate_from_to, State as SupraState};
 
     // error codes.
     const ELoanNotActive: u64 = 100;
     const EUnAuthLoan: u64 = 101;
     const EZeroAmount: u64 = 102;
+    const EInsufficientAmount: u64 = 103;
+    const EAlreadyExecuted: u64 = 104;
 
     // cross chain method identifier.
     const ON_BORROW_METHOD: vector<u8> =
@@ -49,13 +52,15 @@ module orbital::orbital {
     const LoanStateSETTLED: u8 = 2;
     const LoanStateDEFAULTED: u8 = 3;
 
+    const 0NE_YEAR: u64 = 10000;
+
     ////////////////////////////////
     ////        STRUCTS         ////
     ////////////////////////////////
 
     public struct Loan<phantom X> has key, store {
         id: UID,
-        token_type: u8,
+        coin_type: u8,
         coin_in: Balance<X>,
         state: u8,
         start_secs: u64,
@@ -63,7 +68,7 @@ module orbital::orbital {
 
     public struct ForeignLoan<phantom Y> has key, store {
         id: UID,
-        token_type: u8,
+        coin_type: u8,
         coin_out: Balance<Y>,
         state: u8,
         start_secs: u64,
@@ -133,21 +138,21 @@ module orbital::orbital {
     ////////////////////////////////
 
     /// @notice
-    public entry fun borrow<X, Y>(
+    public entry fun borrow<X: copy, Y>(
         state: &mut State,
         wormhole_state: &mut WormholeState,
         the_clock: &Clock,
         to_chain_id: u16,
         coin_gas: Coin<SUI>,
         coin_in: Coin<X>,
-        token_type: u8,
+        coin_type: u8,
         receiver: address,
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
 
         // Take loan with tokens.
-        if (token_type == CoinTypeTOKEN) {
+        if (coin_type == CoinTypeTOKEN) {
             borrow_with_coins<X, Y>(
                 state,
                 wormhole_state,
@@ -156,13 +161,13 @@ module orbital::orbital {
                 to_chain_id,
                 coin_gas,
                 coin_in,
-                token_type,
+                coin_type,
                 receiver,
                 ctx
             );
         };
         
-        // if (token_type == CoinTypeTOKEN) {
+        // if (coin_type == CoinTypeTOKEN) {
         //     borrow_with_non_coins<X, Y>(
         //         state,
         //         wormhole_state,
@@ -171,7 +176,7 @@ module orbital::orbital {
         //         to_chain_id,
         //         coin_gas,
         //         coin_in,
-        //         token_type,
+        //         coin_type,
         //         receiver,
         //         ctx
         //     );
@@ -180,16 +185,125 @@ module orbital::orbital {
         abort 0
     }
 
-    
+    public entry fun repay<Y: copy>(
+        state: &mut State,
+        wormhole_state: &mut WormholeState,
+        the_clock: &Clock,
+        loan: &mut ForeignLoan<Y>,
+        coin_out: Coin<Y>,
+        ctx: &mut TxContext
+    ) {
 
-    // /// @dev Private functions for borrow.
+    }
+
+    fun repay_with_coins<Y: copy>(
+        state: &mut State,
+        wormhole_state: &mut WormholeState,
+        the_clock: &Clock,
+        loan: &mut ForeignLoan<Y>,
+        coin_out: Coin<Y>,
+        ctx: &mut TxContext
+    ) : bool {
+
+        let loan_value: u64 = balance::value<Balance<Y>>(&loan.coin_out);
+
+        let interest: u64 = estimate_interest(
+            loan_value,
+            loan.start_secs,
+            loan.interest_rate,
+            the_clock
+        );
+
+        let amount_in = loan_value + interest;
+
+        let coin_out_value: u64 = coin::value<Coin<Y>>(&coin_out);
+
+        assert!(coin_out_value >= amount_in, EInsufficientAmount);
+
+        // Transfer coin in to vault.
+        transfer::public_transfer<Coin<Y>>(coin_out, state.vault);
+
+        loan.state = LoanStateSETTLED;
+
+        true
+    }
+
+    // Function will be trigger my orbital reyaler.
+    public entry fun receive_message(
+        state: &mut State,
+        nonce: u32,
+        method: vector<u8>
+    ) {
+        assert!(
+            *vec_map::get(&state.executeds, &nonce) == false,
+            EAlreadyExecuted
+        )
+
+        if (method == ON_BORROW_METHOD) {
+            on_borrow(
+                state,
+                the_clock,
+                coin_type,
+                coin_out_address,
+                coin_out_value
+            );
+        };
+
+        if (method == ON_REPAY_METHOD) {
+            on_repay(
+
+            );
+        };
+
+        if (method == ON_DEFAULT_METHOD) {
+            // to do
+        };
+
+        state.executeds.insert(nonce, true)
+    }
+
+    // notice Thus function receives borrow events from foreign orbitals.
+    fun on_borrow<Y>(
+        state: &mut State,
+        the_clock: &Clock,
+        coin_type: u8,
+        coin_out_address: address,
+        coin_out_value: u64,
+        receiver: address,
+        ctx: &mut TxContext
+    ) : bool {
+        let timestamp = clock::timestamp_ms(the_clock) / 1000;
+
+        let interest_rate: u64 = *vec_map::get(&state.interest_rates, &coin_out_address);
+        
+        // notice Transfer tokens to receiver.
+        vault::transfer_coins<Y>(coin_out_value, receiver);
+        
+        // Get the output coin balance.
+        let coin_out_balance = coin::into_balance<Y>(coin_out);
+
+        // Save loan object to sender.
+        transfer::public_transfer(
+            ForeignLoan<Y> {
+                id: object::new(ctx),
+                coin_type: coin_type,
+                coin_out: coin_out_balance,
+                state: LoanStateACTIVE,
+                start_secs: timestamp,
+                interest_rate: interest_rate
+            }, 
+            receiver
+        );
+
+        true
+    }
 
     // ////////////////////////////////
     // ////         BORROW         ////
     // ////////////////////////////////
     
     /// @notice
-    fun borrow_with_coins<X, Y>(
+    fun borrow_with_coins<X: copy, Y>(
         state: &mut State,
         wormhole_state: &mut WormholeState,
         the_clock: &Clock,
@@ -197,7 +311,7 @@ module orbital::orbital {
         to_chain_id: u16,
         coin_gas: Coin<SUI>, // Message fee.
         coin_in: Coin<X>, // Extract coins from sender.
-        token_type: u8,
+        coin_type: u8,
         receiver: address,
         ctx: &mut TxContext
     ) : bool {
@@ -272,7 +386,7 @@ module orbital::orbital {
         transfer::public_transfer(
             Loan<X> {
                 id: object::new(ctx),
-                token_type: token_type,
+                coin_type: coin_type,
                 coin_in: coin_in_balance,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
@@ -295,7 +409,7 @@ module orbital::orbital {
     //     to_chain_id: u16,
     //     coin_gas: Coin<SUI>,
     //     coin_in: Coin<X>,
-    //     token_type: u8,
+    //     coin_type: u8,
     //     receiver: address,
     //     ctx: &mut TxContext
     // ): bool { 
@@ -306,6 +420,22 @@ module orbital::orbital {
 
     fun is_token_supported(supported_tokens: VecSet<address>, coin_id: address): bool {
         vec_set::contains(&supported_tokens, &coin_id)
+    }
+
+    fun estimate_interest(
+        value: u64,
+        start_secs: u64,
+        interest_rate: u64,
+        the_clock: &Clock,
+    ) : u64 {
+        let timestamp = clock::timestamp_ms(the_clock) / 1000;
+
+        let duration: u64 = timestamp - start_secs;
+
+        let interest = (value * interest_rate * duration) /
+            (100 * 0NE_YEAR * 24 * 60 * 60);
+        
+        interest
     }
 
     fun split_amount(value: u64, percentage: u8) : (u64, u64) {

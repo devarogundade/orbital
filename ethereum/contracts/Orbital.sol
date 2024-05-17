@@ -164,12 +164,9 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Convert output token to solidity address.
         address tokenOutAddress = loan.tokenOut.bytes32ToAddress();
 
-        /// @notice Extract tokens from sender.
-        IERC20 token = IERC20(tokenOutAddress);
-        token.transferFrom(sender, address(this), amountIn);
-
         /// @notice Transfer tokens to vault.
-        token.transfer(address(_vault), amountIn);
+        IERC20 token = IERC20(tokenOutAddress);
+        token.transferFrom(sender, address(_vault), amountIn);
 
         loan.state = LoanState.SETTLED;
 
@@ -187,11 +184,11 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Otherwise
         if (method == ON_BORROW_METHOD) {
-            require(onBorrow(payload));
+            onBorrow(payload);
         }
         /// @notice Otherwise
         else if (method == ON_REPAY_METHOD) {
-            require(onRepay(payload));
+            onRepay(payload);
         }
         /// @notice Otherwise
         else if (method == ON_DEFAULT_METHOD) {
@@ -235,7 +232,30 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Send out loan tokens to receiver.
         if (tokenType == TokenType.TOKEN || tokenType == TokenType.NFT) {
-            return _onBorrow(loanId, tokenOut, receiver, tokenType, value);
+            /// @notice Convert output token to solidity address.
+            address tokenOutAddress = tokenOut.bytes32ToAddress();
+
+            /// @notice Convert token receiver address to evm address.
+            address receiverAddress = receiver.bytes32ToAddress();
+
+            /// @notice Transfer tokens to receiver.
+            _vault.transferTokens(tokenOutAddress, receiverAddress, amount);
+
+            /// @notice Look up for token interest rate.
+            uint256 interestRate = _interestRates[tokenOut];
+
+            /// @notice Create the foreign loan.
+            _foreignLoans[loanId] = ForeignLoan({
+                receiver: receiver,
+                tokenType: tokenType,
+                tokenOut: tokenOut,
+                value: amount,
+                state: LoanState.ACTIVE,
+                startSecs: block.timestamp,
+                interestRate: interestRate
+            });
+
+            return true;
         }
         /// @notice Otherwise
         else {
@@ -287,12 +307,9 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Check if the token is supported.
         require(_isTokenSupported(tokenInAddress), "Token not supported");
 
-        /// @notice Extract tokens from sender.
-        IERC20 token = IERC20(tokenInAddress);
-        token.transferFrom(sender, address(this), amountIn);
-
         /// @notice Transfer tokens to vault.
-        token.transfer(address(_vault), amountIn);
+        IERC20 token = IERC20(tokenInAddress);
+        token.transferFrom(sender, address(_vault), amountIn);
 
         /// @notice Get input amount equivalent of output amount.
         uint256 amountOut = _priceFeeds.estimateFromTo(
@@ -464,12 +481,8 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Convert token receiver address to evm address.
         address receiver = loan.sender.bytes32ToAddress();
 
-        /// @notice Withdraw tokens from vault.
-        _vault.transferTokens(tokenInAddress, address(this), loan.value);
-
         /// @notice Transfer back locked tokens to sender.
-        IERC20 token = IERC20(tokenInAddress);
-        token.transfer(receiver, loan.value);
+        _vault.transferTokens(tokenInAddress, receiver, loan.value);
 
         /// @notice Update loan status.
         loan.state = LoanState.SETTLED;
@@ -498,44 +511,6 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Update loan status.
         loan.state = LoanState.SETTLED;
-
-        return true;
-    }
-
-    /// @notice
-    function _onBorrow(
-        bytes32 loanId,
-        bytes32 tokenOut,
-        bytes32 receiver,
-        TokenType tokenType,
-        uint256 amount
-    ) internal returns (bool) {
-        /// @notice Convert output token to solidity address.
-        address tokenOutAddress = tokenOut.bytes32ToAddress();
-
-        /// @notice Convert token receiver address to evm address.
-        address receiverAddress = receiver.bytes32ToAddress();
-
-        /// @notice Withdraw tokens from vault.
-        _vault.transferTokens(tokenOutAddress, address(this), amount);
-
-        /// @notice Transfer tokens to receiver.
-        IERC20 token = IERC20(tokenOutAddress);
-        token.transfer(receiverAddress, amount);
-
-        /// @notice Look up for token interest rate.
-        uint256 interestRate = _interestRates[tokenOut];
-
-        /// @notice Create the foreign loan.
-        _foreignLoans[loanId] = ForeignLoan({
-            receiver: receiver,
-            tokenType: tokenType,
-            tokenOut: tokenOut,
-            value: amount,
-            state: LoanState.ACTIVE,
-            startSecs: block.timestamp,
-            interestRate: interestRate
-        });
 
         return true;
     }
