@@ -79,4 +79,11 @@ module orbital::price_feeds {
 
         amount_out
     }
+
+    #[test]
+    fun init_for_testing(
+        ctx: &mut TxContext
+    ) {
+        init(ctx)
+    }
 }

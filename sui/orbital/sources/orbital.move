@@ -7,6 +7,7 @@ module orbital::orbital {
     use sui::transfer::{Self};
     use sui::bag::{Self, Bag};
     use sui::coin::{Self, Coin};
+    use sui::bcs::to_bytes;
     use sui::object::{Self, UID};
     use sui::clock::{Self, Clock};
     use std::string::{Self, String};
@@ -66,14 +67,14 @@ module orbital::orbital {
     /// The pool with exchange.
     public struct Pool<phantom T> has store {
         state: ID,
-        coin_t: Balance<T>,
+        balance: Balance<T>,
         interest_rate: u64
     }
 
     public struct Loan<phantom X> has key, store {
         id: UID,
         coin_type: u8,
-        coin_in: Balance<X>,
+        coin_in_value: u64,
         state: u8,
         start_secs: u64,
     }
@@ -81,7 +82,7 @@ module orbital::orbital {
     public struct ForeignLoan<phantom Y> has key, store {
         id: UID,
         coin_type: u8,
-        coin_out: Balance<Y>,
+        coin_out_value: u64,
         state: u8,
         start_secs: u64,
         interest_rate: u64,
@@ -137,11 +138,29 @@ module orbital::orbital {
 
         let new_pool = Pool {
             state: object::uid_to_inner(&state.id),
-            coin_t: balance::zero<T>(),
+            balance: balance::zero<T>(),
             interest_rate: interest_rate
         };
 
         bag::add(&mut state.pools, coin_id, new_pool)
+    }
+
+    public entry fun fund_pool<T>(
+        owner_cap: &OwnerCap,
+        state: &mut State,
+        coin: Coin<T>,
+        ctx: &mut TxContext
+    ) {
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        // Get coin pool
+        let coin_id = get_coin_id<T>();
+        let pool = bag::borrow_mut<String, Pool<T>>(&mut state.pools, coin_id);
+
+        // Get the input coin value.
+        let coin_balance: Balance<T> = coin.into_balance();
+
+        balance::join<T>(&mut pool.balance, coin_balance);
     }
     
     public entry fun init_with_params(
@@ -184,7 +203,17 @@ module orbital::orbital {
         coin_type: u8,
         receiver: address,
         ctx: &mut TxContext
-    ) : bool {
+    ) : bool {        
+        // Get coin pool
+        let coin_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_id);
+
+        // Get the input coin balance.
+        let coin_in_balance = coin::into_balance<X>(coin_in);
+
+        // Get the input coin value.
+        let coin_in_value: u64 = coin_in_balance.value();
+
         let sender = tx_context::sender(ctx);
 
         // Check if the token is supported.
@@ -196,11 +225,8 @@ module orbital::orbital {
             EUnAuthLoan
         );
 
-        // Get the input coin value.
-        let coin_in_value: u64 = coin::value(&coin_in);
-
-        // Get the input coin balance.
-        let coin_in_balance = coin::into_balance<X>(coin_in);
+        // Increment pool balance.
+        balance::join<X>(&mut pool.balance, coin_in_balance);
 
         // Get input amount equivalent of output amount.
         let amount_out: u64 = estimate_from_to<X,Y>(
@@ -218,9 +244,15 @@ module orbital::orbital {
         // Get the destination orbital address in bytes32.
         let to_contract_id: address = *vec_map::get(&state.orbitals, &to_chain_id);
 
+        // Truncate to seconds.
+        let timestamp = clock::timestamp_ms(the_clock) / 1000;
+
         // Construct a unique loan identifier.
         let mut loan_id: vector<u8> = vector::empty<u8>();
-        vector::push_back(&mut loan_id, 0);
+        vector::append(&mut loan_id, to_bytes<address>(&sender));
+        vector::append(&mut loan_id, to_bytes<address>(&receiver));
+        vector::append(&mut loan_id, to_bytes<u32>(&state.wormhole_nonce));
+        vector::append(&mut loan_id, to_bytes<u64>(&timestamp));
 
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
@@ -246,15 +278,12 @@ module orbital::orbital {
             the_clock
         );
 
-        // Truncate to seconds.
-        let timestamp = clock::timestamp_ms(the_clock) / 1000;
-
         // Save loan object to sender.
         transfer::public_transfer(
             Loan<X> {
                 id: object::new(ctx),
                 coin_type: coin_type,
-                coin_in: coin_in_balance,
+                coin_in_value: coin_in_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
             }, 
@@ -280,23 +309,28 @@ module orbital::orbital {
         let coin_id = get_coin_id<Y>();
         let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
 
+        // Get the input balance.
         let coin_out_balance = coin::into_balance(coin_out);
 
-        let loan_value: u64 = balance::value(&loan.coin_out);
-
+        // Calculate the loan interest.
         let interest: u64 = estimate_interest(
-            loan_value,
+            loan.coin_out_value,
             loan.start_secs,
             loan.interest_rate,
             the_clock
         );
 
-        // Get the repayment value
-        let amount_in = loan_value + interest;
+        // Calculate the repayment value.
+        let amount_in = loan.coin_out_value + interest;
 
+        // Get the input amount.
         let coin_out_value: u64 = coin_out_balance.value();
 
+        // Check if input amount is enough.
         assert!(coin_out_value >= amount_in, EInsufficientAmount);
+
+        // Increment pool balance.
+        balance::join<Y>(&mut pool.balance, coin_out_balance);
 
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
@@ -304,7 +338,8 @@ module orbital::orbital {
 
         // Get wormhole messgase fee.
         let wormhole_fee_value: u64 = message_fee(wormhole_state);
-
+        
+        // Get the input gas fee.
         let coin_gas_value = coin::value(&coin_gas);
 
         // Check the input coin value is enough for message fee.
@@ -321,10 +356,8 @@ module orbital::orbital {
             ),
             the_clock
         );
-        
-        // Increment pool balance
-        balance::join(&mut pool.coin_t, coin_out_balance);
 
+        // Update loan state.
         loan.state = LoanStateSETTLED;
 
         true
@@ -426,15 +459,10 @@ module orbital::orbital {
         let coin_id = get_coin_id<Y>();
         let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
 
-        let coin_out = coin::take<Y>(&mut pool.coin_t, coin_out_value, ctx);
+        let coin_out = coin::take<Y>(&mut pool.balance, coin_out_value, ctx);
 
         // Transfer coins to receiver.
         transfer::public_transfer(coin_out, receiver);
-        
-        // Get the output coin balance.
-        let coin_out_balance = coin::into_balance(
-            coin::zero(ctx)
-        );
         
         let timestamp = clock::timestamp_ms(the_clock) / 1000;
 
@@ -443,7 +471,7 @@ module orbital::orbital {
             ForeignLoan<Y> {
                 id: object::new(ctx),
                 coin_type: coin_type,
-                coin_out: coin_out_balance,
+                coin_out_value: coin_out_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
                 interest_rate: pool.interest_rate
@@ -471,7 +499,7 @@ module orbital::orbital {
         let coin_id = get_coin_id<X>();
         let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_id);
 
-        let coin_in = coin::take<X>(&mut pool.coin_t, loan.coin_in.value(), ctx);
+        let coin_in = coin::take<X>(&mut pool.balance, loan.coin_in_value, ctx);
 
         // Transfer coins to receiver.
         transfer::public_transfer(coin_in, receiver);
