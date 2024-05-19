@@ -26,7 +26,7 @@ module orbital::orbital {
     use wormhole::publish_message::{prepare_message, publish_message};
 
     use orbital::coin_utils::{get_coin_id};
-    use orbital::price_feeds::{get_price, estimate_from_to, State as SupraState};
+    use orbital::price_feeds::{get_price, estimate_from_to, State as PriceFeedState};
 
     // error codes.
     const ELoanNotActive: u64 = 100;
@@ -101,8 +101,6 @@ module orbital::orbital {
         supported_tokens: VecSet<address>,
         supported_nfts: VecSet<address>,
         emitter_cap: EmitterCap,
-        oracle_holder: OracleHolder,
-        supra_state: SupraState,
         pools: Bag,
     }
 
@@ -134,7 +132,7 @@ module orbital::orbital {
         let coin_id = get_coin_id<T>();
 
         let has_registered = bag::contains_with_type<String, Pool<T>>(&state.pools, coin_id);
-        assert!(has_registered, EPoolAlreadyRegistered);
+        assert!(!has_registered, EPoolAlreadyRegistered);
 
         let new_pool = Pool {
             state: object::uid_to_inner(&state.id),
@@ -166,8 +164,6 @@ module orbital::orbital {
     public entry fun init_with_params(
         owner_cap: &OwnerCap,
         wormhole_state: &WormholeState, 
-        oracle_holder: OracleHolder,
-        supra_state: SupraState,
         ctx: &mut TxContext
     ) {
         assert!(owner_cap.admin == tx_context::sender(ctx), 0);
@@ -180,8 +176,6 @@ module orbital::orbital {
             supported_tokens: vec_set::empty(),
             supported_nfts: vec_set::empty(),
             emitter_cap: emitter::new(wormhole_state, ctx),
-            oracle_holder: oracle_holder,
-            supra_state: supra_state,
             pools: bag::new(ctx)
         };
 
@@ -196,6 +190,8 @@ module orbital::orbital {
     public entry fun borrow<X, Y>(
         state: &mut State,
         wormhole_state: &mut WormholeState,
+        oracle_holder: &OracleHolder,
+        supra_state: &mut PriceFeedState,
         the_clock: &Clock,
         to_chain_id: u16,
         coin_gas: Coin<SUI>,
@@ -230,8 +226,8 @@ module orbital::orbital {
 
         // Get input amount equivalent of output amount.
         let amount_out: u64 = estimate_from_to<X,Y>(
-            &state.oracle_holder,
-            &mut state.supra_state,
+            oracle_holder,
+            supra_state,
             coin_in_value
         );
 
