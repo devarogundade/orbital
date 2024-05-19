@@ -1,11 +1,15 @@
+// SPDX-License-Identifier: UNLICENSED
+#[allow(unused_use,unused_const,unused_variable,duplicate_alias,unused_type_parameter,unused_function)]
 module orbital::orbital {
     /// @dev sui deps
     use sui::event;
     use sui::sui::{SUI};
     use sui::transfer::{Self};
+    use sui::bag::{Self, Bag};
     use sui::coin::{Self, Coin};
     use sui::object::{Self, UID};
     use sui::clock::{Self, Clock};
+    use std::string::{Self, String};
     use sui::vec_set::{Self, VecSet};
     use sui::tx_context::{TxContext};
     use sui::vec_map::{Self, VecMap};
@@ -20,8 +24,7 @@ module orbital::orbital {
     use wormhole::state::{State as WormholeState, message_fee};
     use wormhole::publish_message::{prepare_message, publish_message};
 
-    use orbital::vault;
-    use orbital::coin_utils::{take_balance};
+    use orbital::coin_utils::{get_coin_id};
     use orbital::price_feeds::{get_price, estimate_from_to, State as SupraState};
 
     // error codes.
@@ -30,6 +33,8 @@ module orbital::orbital {
     const EZeroAmount: u64 = 102;
     const EInsufficientAmount: u64 = 103;
     const EAlreadyExecuted: u64 = 104;
+    const EPoolAlreadyRegistered: u64 = 105;
+    const EMethod: u64 = 106;
 
     // cross chain method identifier.
     const ON_BORROW_METHOD: vector<u8> =
@@ -52,11 +57,18 @@ module orbital::orbital {
     const LoanStateSETTLED: u8 = 2;
     const LoanStateDEFAULTED: u8 = 3;
 
-    const 0NE_YEAR: u64 = 10000;
+    const ONE_YEAR: u64 = 10000;
 
     ////////////////////////////////
     ////        STRUCTS         ////
     ////////////////////////////////
+    
+    /// The pool with exchange.
+    public struct Pool<phantom T> has store {
+        state: ID,
+        coin_t: Balance<T>,
+        interest_rate: u64
+    }
 
     public struct Loan<phantom X> has key, store {
         id: UID,
@@ -85,13 +97,12 @@ module orbital::orbital {
         wormhole_nonce: u32,
         executeds: VecMap<u32, bool>,
         orbitals: VecMap<u16, address>,
-        interest_rates: VecMap<address, u64>,
         supported_tokens: VecSet<address>,
         supported_nfts: VecSet<address>,
-        vault: address,
         emitter_cap: EmitterCap,
-        price_feeds_oracle_holder: OracleHolder,
-        price_feeds_state: SupraState
+        oracle_holder: OracleHolder,
+        supra_state: SupraState,
+        pools: Bag,
     }
 
     ////////////////////////////////
@@ -106,12 +117,38 @@ module orbital::orbital {
 
         transfer::share_object(owner_cap)
     }
+
+    ////////////////////////////////
+    ////          INITS         ////
+    ////////////////////////////////
+
+    public entry fun create_pool<T>(
+        owner_cap: &OwnerCap,
+        state: &mut State,
+        interest_rate: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        let coin_id = get_coin_id<T>();
+
+        let has_registered = bag::contains_with_type<String, Pool<T>>(&state.pools, coin_id);
+        assert!(has_registered, EPoolAlreadyRegistered);
+
+        let new_pool = Pool {
+            state: object::uid_to_inner(&state.id),
+            coin_t: balance::zero<T>(),
+            interest_rate: interest_rate
+        };
+
+        bag::add(&mut state.pools, coin_id, new_pool)
+    }
     
     public entry fun init_with_params(
-        owner_cap: &mut OwnerCap,
+        owner_cap: &OwnerCap,
         wormhole_state: &WormholeState, 
-        price_feeds_oracle_holder: OracleHolder,
-        price_feeds_state: SupraState,
+        oracle_holder: OracleHolder,
+        supra_state: SupraState,
         ctx: &mut TxContext
     ) {
         assert!(owner_cap.admin == tx_context::sender(ctx), 0);
@@ -121,13 +158,12 @@ module orbital::orbital {
             wormhole_nonce: 1,
             executeds: vec_map::empty(),
             orbitals: vec_map::empty(),
-            interest_rates: vec_map::empty(),
             supported_tokens: vec_set::empty(),
             supported_nfts: vec_set::empty(),
-            vault: ctx.sender(),
             emitter_cap: emitter::new(wormhole_state, ctx),
-            price_feeds_oracle_holder: price_feeds_oracle_holder,
-            price_feeds_state: price_feeds_state
+            oracle_holder: oracle_holder,
+            supra_state: supra_state,
+            pools: bag::new(ctx)
         };
 
         transfer::share_object(state)
@@ -138,7 +174,7 @@ module orbital::orbital {
     ////////////////////////////////
 
     /// @notice
-    public entry fun borrow<X: copy, Y>(
+    public entry fun borrow<X, Y>(
         state: &mut State,
         wormhole_state: &mut WormholeState,
         the_clock: &Clock,
@@ -148,173 +184,9 @@ module orbital::orbital {
         coin_type: u8,
         receiver: address,
         ctx: &mut TxContext
-    ) {
+    ) : bool {
         let sender = tx_context::sender(ctx);
 
-        // Take loan with tokens.
-        if (coin_type == CoinTypeTOKEN) {
-            borrow_with_coins<X, Y>(
-                state,
-                wormhole_state,
-                the_clock,
-                sender, 
-                to_chain_id,
-                coin_gas,
-                coin_in,
-                coin_type,
-                receiver,
-                ctx
-            );
-        };
-        
-        // if (coin_type == CoinTypeTOKEN) {
-        //     borrow_with_non_coins<X, Y>(
-        //         state,
-        //         wormhole_state,
-        //         the_clock,
-        //         sender, 
-        //         to_chain_id,
-        //         coin_gas,
-        //         coin_in,
-        //         coin_type,
-        //         receiver,
-        //         ctx
-        //     );
-        // };
-
-        abort 0
-    }
-
-    public entry fun repay<Y: copy>(
-        state: &mut State,
-        wormhole_state: &mut WormholeState,
-        the_clock: &Clock,
-        loan: &mut ForeignLoan<Y>,
-        coin_out: Coin<Y>,
-        ctx: &mut TxContext
-    ) {
-
-    }
-
-    fun repay_with_coins<Y: copy>(
-        state: &mut State,
-        wormhole_state: &mut WormholeState,
-        the_clock: &Clock,
-        loan: &mut ForeignLoan<Y>,
-        coin_out: Coin<Y>,
-        ctx: &mut TxContext
-    ) : bool {
-
-        let loan_value: u64 = balance::value<Balance<Y>>(&loan.coin_out);
-
-        let interest: u64 = estimate_interest(
-            loan_value,
-            loan.start_secs,
-            loan.interest_rate,
-            the_clock
-        );
-
-        let amount_in = loan_value + interest;
-
-        let coin_out_value: u64 = coin::value<Coin<Y>>(&coin_out);
-
-        assert!(coin_out_value >= amount_in, EInsufficientAmount);
-
-        // Transfer coin in to vault.
-        transfer::public_transfer<Coin<Y>>(coin_out, state.vault);
-
-        loan.state = LoanStateSETTLED;
-
-        true
-    }
-
-    // Function will be trigger my orbital reyaler.
-    public entry fun receive_message(
-        state: &mut State,
-        nonce: u32,
-        method: vector<u8>
-    ) {
-        assert!(
-            *vec_map::get(&state.executeds, &nonce) == false,
-            EAlreadyExecuted
-        )
-
-        if (method == ON_BORROW_METHOD) {
-            on_borrow(
-                state,
-                the_clock,
-                coin_type,
-                coin_out_address,
-                coin_out_value
-            );
-        };
-
-        if (method == ON_REPAY_METHOD) {
-            on_repay(
-
-            );
-        };
-
-        if (method == ON_DEFAULT_METHOD) {
-            // to do
-        };
-
-        state.executeds.insert(nonce, true)
-    }
-
-    // notice Thus function receives borrow events from foreign orbitals.
-    fun on_borrow<Y>(
-        state: &mut State,
-        the_clock: &Clock,
-        coin_type: u8,
-        coin_out_address: address,
-        coin_out_value: u64,
-        receiver: address,
-        ctx: &mut TxContext
-    ) : bool {
-        let timestamp = clock::timestamp_ms(the_clock) / 1000;
-
-        let interest_rate: u64 = *vec_map::get(&state.interest_rates, &coin_out_address);
-        
-        // notice Transfer tokens to receiver.
-        vault::transfer_coins<Y>(coin_out_value, receiver);
-        
-        // Get the output coin balance.
-        let coin_out_balance = coin::into_balance<Y>(coin_out);
-
-        // Save loan object to sender.
-        transfer::public_transfer(
-            ForeignLoan<Y> {
-                id: object::new(ctx),
-                coin_type: coin_type,
-                coin_out: coin_out_balance,
-                state: LoanStateACTIVE,
-                start_secs: timestamp,
-                interest_rate: interest_rate
-            }, 
-            receiver
-        );
-
-        true
-    }
-
-    // ////////////////////////////////
-    // ////         BORROW         ////
-    // ////////////////////////////////
-    
-    /// @notice
-    fun borrow_with_coins<X: copy, Y>(
-        state: &mut State,
-        wormhole_state: &mut WormholeState,
-        the_clock: &Clock,
-        sender: address,
-        to_chain_id: u16,
-        coin_gas: Coin<SUI>, // Message fee.
-        coin_in: Coin<X>, // Extract coins from sender.
-        coin_type: u8,
-        receiver: address,
-        ctx: &mut TxContext
-    ) : bool {
         // Check if the token is supported.
         assert!(
             is_token_supported(
@@ -330,15 +202,10 @@ module orbital::orbital {
         // Get the input coin balance.
         let coin_in_balance = coin::into_balance<X>(coin_in);
 
-        // Transfer coin in to vault.
-        transfer::public_transfer<Coin<X>>(coin_in, state.vault);
-
         // Get input amount equivalent of output amount.
-        let amount_out: u64 = estimate_from_to(
-            &state.price_feeds_oracle_holder,
-            &mut state.price_feeds_state,
-            sender, // coin in address
-            receiver, // coin out address
+        let amount_out: u64 = estimate_from_to<X,Y>(
+            &state.oracle_holder,
+            &mut state.supra_state,
             coin_in_value
         );
 
@@ -346,7 +213,7 @@ module orbital::orbital {
         let (loan, _) = split_amount(amount_out, LTV);
 
         // Convert this orbital address to type bytes32.
-        // let from_contract_id: address = 0xe51ff5cd221a81c3d6e22b9e670ddf99004d71de4f769b0312b68c7c4872e2f1;
+        let from_contract_id: address = @orbital;
 
         // Get the destination orbital address in bytes32.
         let to_contract_id: address = *vec_map::get(&state.orbitals, &to_chain_id);
@@ -400,21 +267,219 @@ module orbital::orbital {
         true
     }
 
-    /// @notice
-    // fun borrow_with_non_coins<X, Y>(
-    //     state: &mut State,
-    //     wormhole_state: &mut WormholeState,
-    //     the_clock: &Clock,
-    //     sender: address,
-    //     to_chain_id: u16,
-    //     coin_gas: Coin<SUI>,
-    //     coin_in: Coin<X>,
-    //     coin_type: u8,
-    //     receiver: address,
-    //     ctx: &mut TxContext
-    // ): bool { 
-    //     true
-    // }
+    public entry fun repay<Y>(
+        state: &mut State,
+        coin_gas: Coin<SUI>, // Message fee.
+        wormhole_state: &mut WormholeState,
+        the_clock: &Clock,
+        loan: &mut ForeignLoan<Y>,
+        coin_out: Coin<Y>,
+        ctx: &mut TxContext
+    ) : bool {
+        // Get coin pool
+        let coin_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
+
+        let coin_out_balance = coin::into_balance(coin_out);
+
+        let loan_value: u64 = balance::value(&loan.coin_out);
+
+        let interest: u64 = estimate_interest(
+            loan_value,
+            loan.start_secs,
+            loan.interest_rate,
+            the_clock
+        );
+
+        // Get the repayment value
+        let amount_in = loan_value + interest;
+
+        let coin_out_value: u64 = coin_out_balance.value();
+
+        assert!(coin_out_value >= amount_in, EInsufficientAmount);
+
+        // Build an inter-chain message.
+        let mut payload = vector::empty<u8>();
+        vector::append(&mut payload, ON_REPAY_METHOD);
+
+        // Get wormhole messgase fee.
+        let wormhole_fee_value: u64 = message_fee(wormhole_state);
+
+        let coin_gas_value = coin::value(&coin_gas);
+
+        // Check the input coin value is enough for message fee.
+        assert!(coin_gas_value >= wormhole_fee_value, EZeroAmount);
+
+        // Publish message on wormhole guardian.
+        publish_message(
+            wormhole_state,
+            coin_gas, // Pay wormhole message fee.
+            prepare_message(
+                &mut state.emitter_cap, 
+                state.wormhole_nonce, 
+                payload
+            ),
+            the_clock
+        );
+        
+        // Increment pool balance
+        balance::join(&mut pool.coin_t, coin_out_balance);
+
+        loan.state = LoanStateSETTLED;
+
+        true
+    }
+
+    // This function receives borrow events from foreign orbitals.
+    public entry fun receive_on_borrow<Y>(
+        owner_cap: &OwnerCap,
+        state: &mut State,
+        nonce: u32,
+        method: vector<u8>,
+        receiver: address,
+        coin_out_value: u64,
+        coin_type: u8,
+        the_clock: &Clock,        
+        ctx: &mut TxContext
+    ) {
+        // Only admin function.
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        // Check if message was already executed.
+        assert!(
+            *vec_map::get(&state.executeds, &nonce) == false,
+            EAlreadyExecuted
+        );
+
+        // Check the method args is correct.
+        assert!(
+            method == ON_BORROW_METHOD,
+            EMethod
+        );
+
+        // Get the execution result.
+        let result: bool = on_borrow<Y>(
+            state,
+            the_clock,
+            coin_type,
+            coin_out_value,
+            receiver,
+            ctx
+        );
+
+        // Update the execution state.
+        state.executeds.insert(nonce, result)
+    }
+
+    // This function receives repay events from foreign orbitals.
+    public entry fun receive_on_repay<X>(
+        owner_cap: &OwnerCap,
+        state: &mut State,
+        nonce: u32,
+        method: vector<u8>,
+        receiver: address,
+        loan: &mut Loan<X>,
+        coin_type: u8,      
+        ctx: &mut TxContext
+    ) {
+        // Only admin function.
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        // Check if message was already executed.
+        assert!(
+            *vec_map::get(&state.executeds, &nonce) == false,
+            EAlreadyExecuted
+        );
+
+        // Check the method args is correct.
+        assert!(
+            method == ON_REPAY_METHOD,
+            EMethod
+        );
+
+        // Get the execution result.
+        let result: bool = on_repay<X>(
+            state,
+            loan,
+            coin_type,
+            receiver,
+            ctx
+        );
+
+        // Update the execution state.
+        state.executeds.insert(nonce, result)
+    }
+
+    ////////////////////////////////
+    ////         PRIVATE        ////
+    ////////////////////////////////
+
+    fun on_borrow<Y>(
+        state: &mut State,
+        the_clock: &Clock,
+        coin_type: u8,
+        coin_out_value: u64,
+        receiver: address,
+        ctx: &mut TxContext
+    ) : bool {
+        // Get pool
+        let coin_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
+
+        let coin_out = coin::take<Y>(&mut pool.coin_t, coin_out_value, ctx);
+
+        // Transfer coins to receiver.
+        transfer::public_transfer(coin_out, receiver);
+        
+        // Get the output coin balance.
+        let coin_out_balance = coin::into_balance(
+            coin::zero(ctx)
+        );
+        
+        let timestamp = clock::timestamp_ms(the_clock) / 1000;
+
+        // Save loan object to sender.
+        transfer::public_transfer(
+            ForeignLoan<Y> {
+                id: object::new(ctx),
+                coin_type: coin_type,
+                coin_out: coin_out_balance,
+                state: LoanStateACTIVE,
+                start_secs: timestamp,
+                interest_rate: pool.interest_rate
+            }, 
+            receiver
+        );
+
+        true
+    }
+
+    fun on_repay<X>(
+        state: &mut State,
+        loan: &mut Loan<X>,
+        coin_type: u8,
+        receiver: address,
+        ctx: &mut TxContext
+    ) : bool {
+        // Check if loan is still active.
+        assert!(
+            loan.state == LoanStateACTIVE,
+            ELoanNotActive
+        );
+
+        // Get pool
+        let coin_id = get_coin_id<X>();
+        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_id);
+
+        let coin_in = coin::take<X>(&mut pool.coin_t, loan.coin_in.value(), ctx);
+
+        // Transfer coins to receiver.
+        transfer::public_transfer(coin_in, receiver);
+
+        loan.state = LoanStateSETTLED;
+
+        true
+    }
 
     /// @dev helper functions
 
@@ -432,8 +497,8 @@ module orbital::orbital {
 
         let duration: u64 = timestamp - start_secs;
 
-        let interest = (value * interest_rate * duration) /
-            (100 * 0NE_YEAR * 24 * 60 * 60);
+        let interest: u64 = (value * interest_rate * duration) /
+            (100 * ONE_YEAR * 24 * 60 * 60);
         
         interest
     }

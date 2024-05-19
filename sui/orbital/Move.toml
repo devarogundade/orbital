@@ -6,7 +6,6 @@ authors = ["Ibrahim Arogundade (devarogundade@gmail.com)"]
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
-price_feeds = { local = "../price_feeds" }
 Wormhole = { local = '../wormhole' }
 supra = { local = '../supra' }
 
