@@ -191,7 +191,7 @@ module orbital::orbital {
         state: &mut State,
         wormhole_state: &mut WormholeState,
         oracle_holder: &OracleHolder,
-        supra_state: &mut PriceFeedState,
+        price_feeds_state: &mut PriceFeedState,
         the_clock: &Clock,
         to_chain_id: u16,
         coin_gas: Coin<SUI>,
@@ -227,7 +227,7 @@ module orbital::orbital {
         // Get input amount equivalent of output amount.
         let amount_out: u64 = estimate_from_to<X,Y>(
             oracle_holder,
-            supra_state,
+            price_feeds_state,
             coin_in_value
         );
 
