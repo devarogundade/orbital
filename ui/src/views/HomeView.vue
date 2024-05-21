@@ -21,7 +21,7 @@ const getSwiper = (swiperInstance: SwiperType) => {
             <div class="announcement">
               <div class="announcement_gradient"></div>
               <img class="annoucement_bg"
-                src="https://img.freepik.com/free-vector/cartoon-galaxy-background_23-2148973053.jpg?t=st=1714925481~exp=1714929081~hmac=ddb847bec7a31fb272ecd5035866427ccdc8d6e39e11d51f2fd80a4283ddbb61&w=1380" />
+                src="https://images.aeonmedia.co/images/8c5cde6d-bd81-4c6c-90fe-3b0da8b2cde4/creating-a-wormhole-in-a-quantum-computer-landscape-1.jpg?width=3840&quality=75&format=auto" />
               <div class="announcement_content">
                 <h3>Unlock the universe of decentralized finance with Orbital: Your gateway to limitless cross-chain
                   lending.</h3>
@@ -56,7 +56,7 @@ const getSwiper = (swiperInstance: SwiperType) => {
             <div class="borrow_text">
               <h3>Borrow</h3>
               <p>Bridge your assets seamlessly with our cross-chain lending protocol on Sui: Where liquidity meets
-                opportunity."</p>
+                opportunity.</p>
               <RouterLink to="/borrow"><button>borrow.start()</button></RouterLink>
             </div>
 
@@ -67,14 +67,13 @@ const getSwiper = (swiperInstance: SwiperType) => {
 
           <div class="lend">
             <div class="lend_image">
-              <img src="https://cdn.pixabay.com/photo/2023/09/04/17/04/mars-8233226_640.png" alt="">
+              <img src="https://suifrens.com/images/accessorize-bullshark-cowboy.svg" alt="">
             </div>
 
             <div class="lend_text">
-              <h3>Provide liquidity</h3>
-              <p>Bridge your assets seamlessly with our cross-chain lending protocol on Sui: Where liquidity meets
-                opportunity."</p>
-              <RouterLink to="/earn"><button>earn.start()</button></RouterLink>
+              <h3>Boost yout LTV</h3>
+              <p>Stake your SUIFRENS NFT to increase your Loan-To-Value ratio above 80%.</p>
+              <RouterLink to="/amplifier"><button>amplifier.start()</button></RouterLink>
             </div>
           </div>
         </div>

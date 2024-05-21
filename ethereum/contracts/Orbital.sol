@@ -6,8 +6,6 @@ import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
 
 import {AddressToBytes32} from "./libraries/AddressToBytes32.sol";
 
-import {Vault} from "./Vault.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -57,8 +55,6 @@ contract Orbital is IOrbital, Ownable2Step {
     /// @notice PriceFeeds - using by pyth network.
     IPriceFeeds private _priceFeeds;
 
-    Vault private _vault;
-
     /// @notice Wormhole deps
     IWormhole private immutable _wormhole;
     uint8 private constant CONSISTENCY_LEVEL = 200;
@@ -71,7 +67,6 @@ contract Orbital is IOrbital, Ownable2Step {
         _wormholeNonce = 1;
         _priceFeeds = IPriceFeeds(priceFeeds);
         _wormhole = IWormhole(wormhole);
-        _vault = new Vault();
     }
 
     /// @notice
@@ -166,7 +161,37 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Transfer tokens to vault.
         IERC20 token = IERC20(tokenOutAddress);
-        token.transferFrom(sender, address(_vault), amountIn);
+        token.transferFrom(sender, address(this), amountIn);
+
+        /// @notice Convert this orbital address to type bytes32.
+        bytes32 fromContractId = AddressToBytes32.addressToBytes32(
+            address(this)
+        );
+
+        /// @notice Get the destination orbital address in bytes32.
+        bytes32 toContractId = _orbitals[loan.toChainId];
+
+        /// @notice Get wormhole messgase fee.
+        uint256 wormholeFee = _wormhole.messageFee();
+
+        /// @notice Check if gas supplied is enough for wormhole operation.
+        require(msg.value == wormholeFee, "Insufficient message fee");
+
+        /// @notice Build an inter-chain message.
+        bytes memory payload = abi.encode(
+            ON_REPAY_METHOD,
+            loanId,
+            loan.toChainId,
+            fromContractId,
+            toContractId
+        );
+
+        /// @notice Publish message on wormhole guardian.
+        _wormhole.publishMessage{value: wormholeFee}(
+            _wormholeNonce,
+            payload,
+            CONSISTENCY_LEVEL
+        );
 
         loan.state = LoanState.SETTLED;
 
@@ -174,28 +199,50 @@ contract Orbital is IOrbital, Ownable2Step {
     }
 
     /// @dev Function will be trigger my orbital reyaler.
-    function receiveMessage(
+    function receiveOnBorrow(
         uint32 wormholeNonce,
         bytes32 method,
-        bytes memory payload
+        bytes32 loanId,
+        bytes32 receiver,
+        uint16 fromChainId,
+        bytes32 fromContractId,
+        bytes32 tokenOut,
+        TokenType tokenType,
+        uint256 value
     ) external override onlyOwner {
         /// @notice Check if nonce was executed.
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
-        /// @notice Otherwise
         if (method == ON_BORROW_METHOD) {
-            onBorrow(payload);
+            onBorrow(
+                loanId,
+                receiver,
+                fromChainId,
+                fromContractId,
+                tokenOut,
+                tokenType,
+                value
+            );
+        } else {
+            revert("Undefined method");
         }
-        /// @notice Otherwise
-        else if (method == ON_REPAY_METHOD) {
-            onRepay(payload);
-        }
-        /// @notice Otherwise
-        else if (method == ON_DEFAULT_METHOD) {
-            // todo
-        }
-        /// @notice Otherwise
-        else {
+
+        /// @notice Update nonce as executed.
+        _executeds[wormholeNonce] = true;
+    }
+
+    /// @dev Function will be trigger my orbital reyaler.
+    function receiveOnRepay(
+        uint32 wormholeNonce,
+        bytes32 method,
+        bytes32 loanId
+    ) external override onlyOwner {
+        /// @notice Check if nonce was executed.
+        require(!_executeds[wormholeNonce], "Nonce was already executed.");
+
+        if (method == ON_REPAY_METHOD) {
+            onRepay(loanId);
+        } else {
             revert("Undefined method");
         }
 
@@ -204,20 +251,15 @@ contract Orbital is IOrbital, Ownable2Step {
     }
 
     /// @notice Thus function receives borrow events from foreign orbitals.
-    function onBorrow(bytes memory payload) internal returns (bool) {
-        (
-            bytes32 loanId,
-            bytes32 receiver,
-            uint16 fromChainId,
-            bytes32 fromContractId,
-            bytes32 tokenOut,
-            TokenType tokenType,
-            uint256 value // Can be amount for erc20 or tokenId for erc721.
-        ) = abi.decode(
-                payload,
-                (bytes32, bytes32, uint16, bytes32, bytes32, TokenType, uint256)
-            );
-
+    function onBorrow(
+        bytes32 loanId,
+        bytes32 receiver,
+        uint16 fromChainId,
+        bytes32 fromContractId,
+        bytes32 tokenOut,
+        TokenType tokenType,
+        uint256 value // Can be amount for erc20 or tokenId for erc721.
+    ) internal returns (bool) {
         /// @notice Check the foreign orbital is correct.
         require(
             _orbitals[fromChainId] == fromContractId,
@@ -231,42 +273,36 @@ contract Orbital is IOrbital, Ownable2Step {
         );
 
         /// @notice Send out loan tokens to receiver.
-        if (tokenType == TokenType.TOKEN || tokenType == TokenType.NFT) {
-            /// @notice Convert output token to solidity address.
-            address tokenOutAddress = tokenOut.bytes32ToAddress();
+        /// @notice Convert output token to solidity address.
+        address tokenOutAddress = tokenOut.bytes32ToAddress();
 
-            /// @notice Convert token receiver address to evm address.
-            address receiverAddress = receiver.bytes32ToAddress();
+        /// @notice Convert token receiver address to evm address.
+        address receiverAddress = receiver.bytes32ToAddress();
 
-            /// @notice Transfer tokens to receiver.
-            _vault.transferTokens(tokenOutAddress, receiverAddress, amount);
+        /// @notice Transfer tokens to receiver.
+        IERC20 token = IERC20(tokenOutAddress);
+        token.transfer(receiverAddress, value);
 
-            /// @notice Look up for token interest rate.
-            uint256 interestRate = _interestRates[tokenOut];
+        /// @notice Look up for token interest rate.
+        uint256 interestRate = _interestRates[tokenOut];
 
-            /// @notice Create the foreign loan.
-            _foreignLoans[loanId] = ForeignLoan({
-                receiver: receiver,
-                tokenType: tokenType,
-                tokenOut: tokenOut,
-                value: amount,
-                state: LoanState.ACTIVE,
-                startSecs: block.timestamp,
-                interestRate: interestRate
-            });
+        /// @notice Create the foreign loan.
+        _foreignLoans[loanId] = ForeignLoan({
+            receiver: receiver,
+            tokenType: tokenType,
+            tokenOut: tokenOut,
+            value: value,
+            state: LoanState.ACTIVE,
+            startSecs: block.timestamp,
+            interestRate: interestRate,
+            toChainId: fromChainId
+        });
 
-            return true;
-        }
-        /// @notice Otherwise
-        else {
-            revert("Undefined method");
-        }
+        return true;
     }
 
     /// @notice This function receives repay events from foreign orbitals.
-    function onRepay(bytes memory payload) internal returns (bool) {
-        bytes32 loanId = abi.decode(payload, (bytes32));
-
+    function onRepay(bytes32 loanId) internal returns (bool) {
         /// @notice Lookup for loan.
         Loan memory loan = _loans[loanId];
 
@@ -309,7 +345,7 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Transfer tokens to vault.
         IERC20 token = IERC20(tokenInAddress);
-        token.transferFrom(sender, address(_vault), amountIn);
+        token.transferFrom(sender, address(this), amountIn);
 
         /// @notice Get input amount equivalent of output amount.
         uint256 amountOut = _priceFeeds.estimateFromTo(
@@ -342,6 +378,7 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Build an inter-chain message.
         bytes memory payload = abi.encode(
+            ON_BORROW_METHOD,
             loanId,
             sender.addressToBytes32(),
             receiver,
@@ -395,9 +432,6 @@ contract Orbital is IOrbital, Ownable2Step {
         IERC721 nft = IERC721(tokenInAddress);
         nft.transferFrom(sender, address(this), tokenId);
 
-        /// @notice Transfer tokens to vault.
-        nft.transferFrom(address(this), address(_vault), tokenId);
-
         /// @notice Get input amount equivalent of output amount.
         uint256 amountOut = _priceFeeds.estimateFromTo(
             nftIn,
@@ -429,6 +463,7 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// Build inter-chain message.
         bytes memory payload = abi.encode(
+            ON_REPAY_METHOD,
             loanId,
             sender.addressToBytes32(),
             receiver,
@@ -482,7 +517,8 @@ contract Orbital is IOrbital, Ownable2Step {
         address receiver = loan.sender.bytes32ToAddress();
 
         /// @notice Transfer back locked tokens to sender.
-        _vault.transferTokens(tokenInAddress, receiver, loan.value);
+        IERC20 token = IERC20(tokenInAddress);
+        token.transfer(receiver, loan.value);
 
         /// @notice Update loan status.
         loan.state = LoanState.SETTLED;
@@ -501,9 +537,6 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Convert nft receiver address to evm address.
         address receiver = loan.sender.bytes32ToAddress();
-
-        /// @notice Withdraw nft from vault.
-        _vault.transferNft(tokenInAddress, address(this), loan.value);
 
         /// @notice Transfer back locked nft to sender.
         IERC721 nft = IERC721(tokenInAddress);

@@ -30,6 +30,7 @@ interface IOrbital {
         LoanState state;
         uint256 startSecs;
         uint256 interestRate;
+        uint16 toChainId;
     }
 
     function borrow(
@@ -41,9 +42,21 @@ interface IOrbital {
         bytes32 receiver
     ) external payable returns (bytes32);
 
-    function receiveMessage(
+    function receiveOnBorrow(
         uint32 wormholeNonce,
         bytes32 method,
-        bytes memory payload
+        bytes32 loanId,
+        bytes32 receiver,
+        uint16 fromChainId,
+        bytes32 fromContractId,
+        bytes32 tokenOut,
+        TokenType tokenType,
+        uint256 value
+    ) external;
+
+    function receiveOnRepay(
+        uint32 wormholeNonce,
+        bytes32 method,
+        bytes32 loanId
     ) external;
 }

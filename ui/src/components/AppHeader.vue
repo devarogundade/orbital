@@ -13,20 +13,84 @@
                     <RouterLink to="/borrow">
                         <button :class="$route.name == 'borrow' ? 'tab active' : 'tab'">Borrow</button>
                     </RouterLink>
-                    <RouterLink to="/earn">
-                        <button :class="$route.name == 'earn' ? 'tab active' : 'tab'">Earn</button>
+                    <RouterLink to="/amplifier">
+                        <button :class="$route.name == 'amplifier' ? 'tab active' : 'tab'">Amplifier</button>
                     </RouterLink>
                 </div>
 
                 <div class="action">
-                    <RouterLink to="/borrow">
+                    <RouterLink to="/borrow" v-if="$route.name == 'home'">
                         <button class="connect">Launch App</button>
                     </RouterLink>
+
+                    <div v-else style="display: flex; gap: 16px;">
+                        <button v-if="!store.state.suiAddress" class="connect" @click="sui.onClick()">
+                            Connect to SUI
+                        </button>
+
+                        <button v-else class="connect">
+                            {{ Converter.fineHash(store.state.suiAddress, 5) }}
+                        </button>
+
+                        <button v-if="!store.state.ethAddress" class="connect" @click="modal.open()">
+                            Connect to Polygon
+                        </button>
+
+                        <button v-else class="connect">
+                            {{ Converter.fineHash(store.state.ethAddress, 5) }}
+                        </button>
+                    </div>
                 </div>
             </header>
+            <SignInWithSui ref="sui" :visible="false" defaultChain="sui:testnet" @connected="onSuiConnected"
+                @disconnected="onSuiDisConnected" />
         </div>
     </section>
 </template>
+
+<script setup lang="ts">
+import { createWeb3Modal } from '@web3modal/wagmi/vue';
+import { useWeb3Modal } from '@web3modal/wagmi/vue';
+import { watchAccount } from '@wagmi/core';
+// @ts-ignore
+import { SignInWithSui } from 'vue-sui';
+import Converter from '@/scripts/converter';
+import { config, projectId, chains } from '../scripts/config';
+// @ts-ignore
+import { useStore } from 'vuex';
+import { key } from '../store';
+import { onMounted, ref } from 'vue';
+
+const sui = ref<SignInWithSui | null>(null);
+
+const store = useStore(key);
+
+const onSuiConnected = (address: string) => {
+    store.commit('setSuiAddress', address);
+};
+
+const onSuiDisConnected = () => {
+    store.commit('setSuiAddress', null);
+};
+
+createWeb3Modal({
+    wagmiConfig: config,
+    projectId: projectId,
+    // @ts-ignore
+    chains: chains,
+    enableAnalytics: true
+});
+
+const modal = useWeb3Modal();
+
+onMounted(() => {
+    watchAccount(config, {
+        onChange(account: any) {
+            store.commit('setEthAddress', account.address);
+        }
+    });
+});
+</script>
 
 <style scoped>
 section {
@@ -45,7 +109,7 @@ header {
 
 .logo,
 .action {
-    min-width: 200px;
+    min-width: 380px;
 }
 
 .tabs {
@@ -79,11 +143,12 @@ header {
 
 .action button {
     height: 45px;
-    width: 160px;
+    min-width: 160px;
     border-radius: 16px;
     background: var(--primary);
     font-size: 18px;
     font-weight: 500;
+    padding: 0 16px;
     color: var(--tx-normal);
 }
 </style>

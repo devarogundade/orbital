@@ -73,6 +73,8 @@ module orbital::orbital {
 
     public struct Loan<phantom X> has key, store {
         id: UID,
+        loan_id: vector<u8>,
+        sender: address,
         coin_type: u8,
         coin_in_value: u64,
         state: u8,
@@ -81,11 +83,14 @@ module orbital::orbital {
 
     public struct ForeignLoan<phantom Y> has key, store {
         id: UID,
+        loan_id: vector<u8>,
+        receiver: address,
         coin_type: u8,
         coin_out_value: u64,
         state: u8,
         start_secs: u64,
         interest_rate: u64,
+        to_chain_id: u16
     }
 
     public struct OwnerCap has key {
@@ -201,8 +206,8 @@ module orbital::orbital {
         ctx: &mut TxContext
     ) : bool {        
         // Get coin pool
-        let coin_id = get_coin_id<Y>();
-        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_id);
+        let coin_out_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_out_id);
 
         // Get the input coin balance.
         let coin_in_balance = coin::into_balance<X>(coin_in);
@@ -253,6 +258,14 @@ module orbital::orbital {
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_BORROW_METHOD);
+        vector::append(&mut payload, loan_id);
+        vector::append(&mut payload, to_bytes<address>(&sender));
+        vector::append(&mut payload, to_bytes<address>(&receiver));
+        vector::append(&mut payload, to_bytes<u16>(&to_chain_id));
+        vector::append(&mut payload, to_bytes<address>(&from_contract_id));
+        vector::append(&mut payload, to_bytes<address>(&to_contract_id));
+        vector::append(&mut payload, to_bytes<String>(&coin_out_id));
+        vector::append(&mut payload, to_bytes<u64>(&loan));
 
         // Get wormhole messgase fee.
         let wormhole_fee_value: u64 = message_fee(wormhole_state);
@@ -275,15 +288,16 @@ module orbital::orbital {
         );
 
         // Save loan object to sender.
-        transfer::public_transfer(
+        transfer::share_object(
             Loan<X> {
                 id: object::new(ctx),
+                loan_id: loan_id,
+                sender: sender,
                 coin_type: coin_type,
                 coin_in_value: coin_in_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
-            }, 
-            sender
+            }
         );
 
         // Update nonce tracker.
@@ -302,8 +316,8 @@ module orbital::orbital {
         ctx: &mut TxContext
     ) : bool {
         // Get coin pool
-        let coin_id = get_coin_id<Y>();
-        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
+        let coin_out_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_out_id);
 
         // Get the input balance.
         let coin_out_balance = coin::into_balance(coin_out);
@@ -328,9 +342,19 @@ module orbital::orbital {
         // Increment pool balance.
         balance::join<Y>(&mut pool.balance, coin_out_balance);
 
+        // Convert this orbital address to type bytes32.
+        let from_contract_id: address = @orbital;
+
+        // Get the destination orbital address in bytes32.
+        let to_contract_id: address = *vec_map::get(&state.orbitals, &loan.to_chain_id);
+
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_REPAY_METHOD);
+        vector::append(&mut payload, loan.loan_id);
+        vector::append(&mut payload, to_bytes<u16>(&loan.to_chain_id));
+        vector::append(&mut payload, to_bytes<address>(&from_contract_id));
+        vector::append(&mut payload, to_bytes<address>(&to_contract_id));
 
         // Get wormhole messgase fee.
         let wormhole_fee_value: u64 = message_fee(wormhole_state);
@@ -365,6 +389,8 @@ module orbital::orbital {
         state: &mut State,
         nonce: u32,
         method: vector<u8>,
+        loan_id: vector<u8>,
+        from_chain_id: u16,
         receiver: address,
         coin_out_value: u64,
         coin_type: u8,
@@ -389,6 +415,8 @@ module orbital::orbital {
         // Get the execution result.
         let result: bool = on_borrow<Y>(
             state,
+            loan_id,
+            from_chain_id,
             the_clock,
             coin_type,
             coin_out_value,
@@ -406,7 +434,6 @@ module orbital::orbital {
         state: &mut State,
         nonce: u32,
         method: vector<u8>,
-        receiver: address,
         loan: &mut Loan<X>,
         coin_type: u8,      
         ctx: &mut TxContext
@@ -431,7 +458,6 @@ module orbital::orbital {
             state,
             loan,
             coin_type,
-            receiver,
             ctx
         );
 
@@ -445,6 +471,8 @@ module orbital::orbital {
 
     fun on_borrow<Y>(
         state: &mut State,
+        loan_id: vector<u8>,
+        from_chain_id: u16,
         the_clock: &Clock,
         coin_type: u8,
         coin_out_value: u64,
@@ -452,8 +480,8 @@ module orbital::orbital {
         ctx: &mut TxContext
     ) : bool {
         // Get pool
-        let coin_id = get_coin_id<Y>();
-        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_id);
+        let coin_out_id = get_coin_id<Y>();
+        let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_out_id);
 
         let coin_out = coin::take<Y>(&mut pool.balance, coin_out_value, ctx);
 
@@ -463,16 +491,18 @@ module orbital::orbital {
         let timestamp = clock::timestamp_ms(the_clock) / 1000;
 
         // Save loan object to sender.
-        transfer::public_transfer(
+        transfer::share_object(
             ForeignLoan<Y> {
                 id: object::new(ctx),
+                loan_id: loan_id,
+                receiver: receiver,
                 coin_type: coin_type,
                 coin_out_value: coin_out_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
-                interest_rate: pool.interest_rate
-            }, 
-            receiver
+                interest_rate: pool.interest_rate,
+                to_chain_id: from_chain_id
+            }
         );
 
         true
@@ -482,7 +512,6 @@ module orbital::orbital {
         state: &mut State,
         loan: &mut Loan<X>,
         coin_type: u8,
-        receiver: address,
         ctx: &mut TxContext
     ) : bool {
         // Check if loan is still active.
@@ -492,13 +521,13 @@ module orbital::orbital {
         );
 
         // Get pool
-        let coin_id = get_coin_id<X>();
-        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_id);
+        let coin_in_id = get_coin_id<X>();
+        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_in_id);
 
         let coin_in = coin::take<X>(&mut pool.balance, loan.coin_in_value, ctx);
 
         // Transfer coins to receiver.
-        transfer::public_transfer(coin_in, receiver);
+        transfer::public_transfer(coin_in, loan.sender);
 
         loan.state = LoanStateSETTLED;
 

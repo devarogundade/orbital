@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '@/views/HomeView.vue';
 import BorrowView from '@/views/BorrowView.vue';
-import EarnView from '@/views/EarnView.vue';
+import AmplifyView from '@/views/AmplifyView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,9 +24,9 @@ const router = createRouter({
       component: BorrowView
     },
     {
-      path: '/earn',
-      name: 'earn',
-      component: EarnView
+      path: '/amplifier',
+      name: 'amplifier',
+      component: AmplifyView
     }
   ]
 });

@@ -11,18 +11,18 @@
               <div class="from_chain">
                 <p>Chain:</p>
                 <div class="chain">
-                  <img src="/images/base.png" alt="">
-                  <p>Base</p>
+                  <img src="/images/sui.png" alt="">
+                  <p>SUI</p>
                 </div>
               </div>
 
               <div class="input_token">
-                <p>Enter amount:</p>
+                <p>Select NFT:</p>
                 <div class="input">
-                  <input type="number" placeholder="0.00" />
+                  <div></div>
                   <div class="token">
-                    <img src="/images/eth.png" alt="">
-                    <p>ETH</p>
+                    <img src="/images/suifrens.svg" alt="">
+                    <p>SUIFRENS</p>
                   </div>
                 </div>
               </div>
@@ -31,12 +31,12 @@
 
           <div class="details">
             <div class="fee">
-              <p>Cross-chain messaging fee</p>
-              <p>Estimated at <span>0.003 ETH</span> on Base.</p>
+              <p>Boost your LTV above 80%</p>
+              <p>Estimated increase of <span>+5%</span> on your LTV.</p>
             </div>
 
             <div class="action">
-              <button>Deposit</button>
+              <button>Stake</button>
             </div>
           </div>
         </div>
@@ -177,13 +177,11 @@ section {
   border-radius: 8px;
 }
 
-input {
+.input>div:first-child {
   color: var(--tx-normal);
   font-size: 16px;
   font-weight: 500;
-  border: none;
-  outline: none;
-  background: none;
+  cursor: pointer;
   padding: 0 16px;
   height: 100%;
   width: 100%;
@@ -196,6 +194,7 @@ input {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 200px;
 }
 
 .token p {
@@ -205,8 +204,8 @@ input {
 }
 
 .token img {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 10px;
 }
 

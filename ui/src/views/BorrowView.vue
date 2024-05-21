@@ -1,4 +1,27 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+import { chain, token } from '@/scripts/chains';
+
+const interchange = () => {
+  let toTemp: number | null = loan.value.toChainId;
+
+  loan.value.toChainId = loan.value.fromChainId;
+  loan.value.fromChainId = toTemp;
+  loan.value.interchange = !loan.value.interchange;
+
+  toTemp = null;
+};
+
+const loan = ref({
+  amountIn: undefined,
+  amountOut: undefined,
+  tokenType: 0,
+  fromChainId: 5,
+  toChainId: 21,
+  collateral: 'USDT',
+  principal: 'BTC',
+  interchange: false
+});
 </script>
 
 <template>
@@ -9,28 +32,28 @@
           <div class="borrow">
             <div class="collateral">
               <div class="token_type">
-                <p>Token Type:</p>
+                <p>Asset Type:</p>
                 <div class="tabs">
-                  <button class="tab active">Token</button>
-                  <button class="tab">NFT</button>
+                  <button :class="loan.tokenType == 0 ? 'tab active' : 'tab'" @click="loan.tokenType = 0">Token</button>
+                  <button :class="'tab'" style="cursor: not-allowed;">NFT</button>
                 </div>
               </div>
 
               <div class="from_chain">
                 <p>From:</p>
                 <div class="chain">
-                  <img src="/images/base.png" alt="">
-                  <p>Base</p>
+                  <img :src="chain(loan.fromChainId)!.image" alt="">
+                  <p>{{ chain(loan.fromChainId)!.name }}</p>
                 </div>
               </div>
 
               <div class="input_token">
                 <p>Enter amount:</p>
                 <div class="input">
-                  <input type="number" placeholder="0.00" />
+                  <input v-model="loan.amountIn" type="number" placeholder="0.00" />
                   <div class="token">
-                    <img src="/images/eth.png" alt="">
-                    <p>ETH</p>
+                    <img :src="token(loan.collateral)!.image" alt="">
+                    <p>{{ token(loan.collateral)!.symbol }}</p>
                   </div>
                 </div>
               </div>
@@ -38,7 +61,7 @@
           </div>
 
           <div class="interchange">
-            <button>
+            <button @click="interchange" :style="loan.interchange ? 'rotate: 180deg;' : ''">
               /
             </button>
           </div>
@@ -56,18 +79,18 @@
               <div class="from_chain">
                 <p>Destination:</p>
                 <div class="chain">
-                  <img src="/images/sui.png" alt="">
-                  <p>Sui</p>
+                  <img :src="chain(loan.toChainId)!.image" alt="">
+                  <p>{{ chain(loan.toChainId)!.name }}</p>
                 </div>
               </div>
 
               <div class="input_token">
                 <p>Est. Principal:</p>
                 <div class="input">
-                  <input type="number" disabled placeholder="0.00" />
+                  <input type="number" :value="loan.amountOut" disabled placeholder="0.00" />
                   <div class="token">
-                    <img src="/images/usdt.png" alt="">
-                    <p>USDT</p>
+                    <img :src="token(loan.principal)!.image" alt="">
+                    <p>{{ token(loan.principal)!.symbol }}</p>
                   </div>
                 </div>
               </div>
@@ -76,18 +99,19 @@
 
           <div class="details">
             <div class="fee">
-              <p>Cross-chain messaging fee</p>
-              <p>Estimated at <span>0.003 ETH</span> on Base.</p>
+              <p>Cross-chain messaging fee.</p>
+              <p>Estimated at <span>0 {{ chain(loan.fromChainId)!.native }}</span> on {{
+                chain(loan.fromChainId)!.name }}.</p>
             </div>
 
             <div class="action">
-              <button>Approve ETH</button>
+              <button>Borrow</button>
             </div>
           </div>
         </div>
 
         <div class="table_container">
-          <h3>Open loans</h3>
+          <h3>My loans</h3>
           <div class="open_loans">
             <table>
               <thead>
@@ -99,16 +123,16 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="index in 5" :key="index">
+                <tr v-for="index in 1" :key="index">
                   <td>{{ index }}</td>
                   <td>
                     <div class="table_collateral">
                       <div class="token">
-                        <img src="/images/eth.png" alt="">
-                        <p>ETH</p>
+                        <img src="/images/btc.png" alt="">
+                        <p>0.1 BTC</p>
                       </div>
                       <div class="chain">
-                        <img src="/images/base.png" alt="">
+                        <img src="/images/polygon.png" alt="">
                         <p>Polygon</p>
                       </div>
                     </div>
@@ -116,12 +140,12 @@
                   <td>
                     <div class="table_principal">
                       <div class="token">
-                        <img src="/images/eth.png" alt="">
-                        <p>ETH</p>
+                        <img src="/images/usdt.png" alt="">
+                        <p>10 USDT</p>
                       </div>
                       <div class="chain">
-                        <img src="/images/base.png" alt="">
-                        <p>Polygon</p>
+                        <img src="/images/sui.png" alt="">
+                        <p>SUI</p>
                       </div>
                     </div>
                   </td>
@@ -145,7 +169,7 @@ section {
 
 .base_container {
   display: flex;
-  gap: 100px;
+  gap: 50px;
   justify-content: center;
 }
 
@@ -371,7 +395,7 @@ input {
   color: var(--tx-normal);
 }
 
-.table_container {}
+/* .table_container {} */
 
 .table_container>h3 {
   color: var(--tx-normal);
@@ -407,7 +431,6 @@ td {
 .table_collateral {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
 td button {
@@ -448,6 +471,8 @@ td button {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: fit-content;
+  margin-top: 4px
 }
 
 .table_container .chain p {
