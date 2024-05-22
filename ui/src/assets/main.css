@@ -1,0 +1,10 @@
+@import './base.css';
+
+:root {
+    --background: #1A1B23;
+    --primary: #0177FB;
+    --tx-normal: #FFF;
+    --tx-dimmed: #8B8CA7;
+    --background-light: #23242F;
+    --background-lighter: #2C2D3A;
+}
