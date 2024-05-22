@@ -16,9 +16,9 @@ module.exports = {
     },
   },
   networks: {
-    baseSepolia: {
-      url: `https://base-goerli.public.blastapi.io`,
-      chainId: 84531,
+    avalanche: {
+      url: `https://api.avax-test.network/ext/bc/C/rpc`,
+      chainId: 43113,
       accounts: {
         mnemonic: MNEMONIC,
         initialIndex: 0,
@@ -27,15 +27,15 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      baseSepolia: SCAN_API_KEY,
+      avalanche: SCAN_API_KEY,
     },
     customChains: [
       {
-        network: 'baseSepolia',
-        chainId: 84531,
+        network: 'avalanche',
+        chainId: 43113,
         urls: {
-          apiURL: 'https://api-goerli.basescan.org/api',
-          browserURL: 'https://goerli.basescan.org/',
+          apiURL: 'https://api.routescan.io/v2/network/testnet/evm/43113/etherscan/api',
+          browserURL: 'https://testnet.snowtrace.io/',
         },
       },
     ],

@@ -7,9 +7,9 @@ export const chains = [
         isEvm: false
     },
     {
-        name: 'Polygon',
-        image: '/images/polygon.png',
-        chainId: 5,
+        name: 'Avalanche',
+        image: '/images/avax.png',
+        chainId: 6,
         native: 'ETH',
         isEvm: true
     }

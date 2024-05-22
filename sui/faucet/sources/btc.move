@@ -12,7 +12,7 @@ module faucet::btc {
     /// Module initializer is called once on module publish. A treasury
     /// cap is sent to the publisher, who then controls minting and burning
     fun init(witness: BTC, ctx: &mut TxContext) {
-        let (treasury, metadata) = coin::create_currency(witness, 9, b"BTC", b"Bitcoin", b"", option::none(), ctx);
+        let (treasury, metadata) = coin::create_currency(witness, 18, b"BTC", b"Bitcoin", b"", option::none(), ctx);
 
         transfer::public_freeze_object(metadata);
 

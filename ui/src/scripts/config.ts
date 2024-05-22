@@ -1,5 +1,5 @@
 import { walletConnect } from '@wagmi/connectors';
-import { polygonMumbai } from '@wagmi/core/chains';
+import { avalancheFuji } from '@wagmi/core/chains';
 import { defaultWagmiConfig } from '@web3modal/wagmi';
 
 export const projectId = 'c8af093fb15a6a3b6e325460f68d1587';
@@ -11,7 +11,7 @@ const metadata = {
     icons: ['https://avatars.githubusercontent.com/u/37784886']
 };
 
-export const chains = [polygonMumbai];
+export const chains = [avalancheFuji];
 
 export const config = defaultWagmiConfig({
     // @ts-ignore

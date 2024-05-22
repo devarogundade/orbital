@@ -36,21 +36,18 @@ module orbital::orbital {
     const EAlreadyExecuted: u64 = 104;
     const EPoolAlreadyRegistered: u64 = 105;
     const EMethod: u64 = 106;
+    const ECoinNotSupported: u64 = 107;
 
     // cross chain method identifier.
     const ON_BORROW_METHOD: vector<u8> =
         vector[79, 78, 95, 66, 79, 82, 82, 79, 87, 95, 77, 69, 84, 72, 79, 68];
     const ON_REPAY_METHOD: vector<u8> =
         vector[79, 78, 95, 82, 69, 80, 65, 89, 95, 77, 69, 84, 72, 79, 68];
-    const ON_DEFAULT_METHOD: vector<u8> =
+    const ON_AMPLIFY_METHOD: vector<u8> =
         vector[79, 78, 95, 68, 69, 70, 65, 85, 76, 84, 95, 77, 69, 84, 72, 79, 68];
 
     // Loan to value ratio.
     const LTV: u8 = 80; // 80 percent
-
-    // Coin Types
-    const CoinTypeTOKEN: u8 = 0;
-    const CoinTypeNFT: u8 = 1;
 
     // Loan States
     const LoanStateNONE: u8 = 0;
@@ -58,7 +55,8 @@ module orbital::orbital {
     const LoanStateSETTLED: u8 = 2;
     const LoanStateDEFAULTED: u8 = 3;
 
-    const ONE_YEAR: u64 = 10000;
+    // One year in seconds
+    const ONE_YEAR: u64 = 31_536_000;
 
     ////////////////////////////////
     ////        STRUCTS         ////
@@ -75,7 +73,6 @@ module orbital::orbital {
         id: UID,
         loan_id: vector<u8>,
         sender: address,
-        coin_type: u8,
         coin_in_value: u64,
         state: u8,
         start_secs: u64,
@@ -85,7 +82,6 @@ module orbital::orbital {
         id: UID,
         loan_id: vector<u8>,
         receiver: address,
-        coin_type: u8,
         coin_out_value: u64,
         state: u8,
         start_secs: u64,
@@ -102,9 +98,9 @@ module orbital::orbital {
         id: UID,
         wormhole_nonce: u32,
         executeds: VecMap<u32, bool>,
-        orbitals: VecMap<u16, address>,
-        supported_tokens: VecSet<address>,
-        supported_nfts: VecSet<address>,
+        foreign_orbitals: VecMap<u16, address>,
+        has_staked_frens: VecMap<address, bool>,
+        supported_coins: VecSet<String>,
         emitter_cap: EmitterCap,
         pools: Bag,
     }
@@ -122,9 +118,39 @@ module orbital::orbital {
         transfer::share_object(owner_cap)
     }
 
-    ////////////////////////////////
-    ////          INITS         ////
-    ////////////////////////////////
+    public entry fun init_state(
+        owner_cap: &OwnerCap,
+        wormhole_state: &WormholeState, 
+        ctx: &mut TxContext
+    ) {
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        let state: State = State {
+            id: object::new(ctx),
+            wormhole_nonce: 1,
+            executeds: vec_map::empty(),
+            foreign_orbitals: vec_map::empty(),
+            supported_coins: vec_set::empty(),
+            has_staked_frens: vec_map::empty(),
+            emitter_cap: emitter::new(wormhole_state, ctx),
+            pools: bag::new(ctx)
+        };
+
+        transfer::share_object(state)
+    }
+
+    public entry fun add_foreign_orbital(
+        owner_cap: &OwnerCap,
+        state: &mut State,
+        chain_id: u16,
+        orbital: address,
+        ctx: &mut TxContext
+    ) {
+        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+
+        // Add orbital to foreign orbitals
+        state.foreign_orbitals.insert(chain_id, orbital);
+    }
 
     public entry fun create_pool<T>(
         owner_cap: &OwnerCap,
@@ -144,6 +170,9 @@ module orbital::orbital {
             balance: balance::zero<T>(),
             interest_rate: interest_rate
         };
+
+        // Add coin to supported coins
+        state.supported_coins.insert(coin_id);
 
         bag::add(&mut state.pools, coin_id, new_pool)
     }
@@ -165,27 +194,6 @@ module orbital::orbital {
 
         balance::join<T>(&mut pool.balance, coin_balance);
     }
-    
-    public entry fun init_with_params(
-        owner_cap: &OwnerCap,
-        wormhole_state: &WormholeState, 
-        ctx: &mut TxContext
-    ) {
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
-
-        let state: State = State {
-            id: object::new(ctx),
-            wormhole_nonce: 1,
-            executeds: vec_map::empty(),
-            orbitals: vec_map::empty(),
-            supported_tokens: vec_set::empty(),
-            supported_nfts: vec_set::empty(),
-            emitter_cap: emitter::new(wormhole_state, ctx),
-            pools: bag::new(ctx)
-        };
-
-        transfer::share_object(state)
-    }
 
     ////////////////////////////////
     ////         ENTRIES        ////
@@ -201,7 +209,6 @@ module orbital::orbital {
         to_chain_id: u16,
         coin_gas: Coin<SUI>,
         coin_in: Coin<X>,
-        coin_type: u8,
         receiver: address,
         ctx: &mut TxContext
     ) : bool {        
@@ -219,11 +226,13 @@ module orbital::orbital {
 
         // Check if the token is supported.
         assert!(
-            is_token_supported(
-                state.supported_tokens, 
-                sender
-            ), 
-            EUnAuthLoan
+            is_coin_supported<X>(state.supported_coins), 
+            ECoinNotSupported
+        );
+
+        assert!(
+            is_coin_supported<Y>(state.supported_coins), 
+            ECoinNotSupported
         );
 
         // Increment pool balance.
@@ -237,13 +246,19 @@ module orbital::orbital {
         );
 
         // Calculate amount out with LTV, i.e 80% of the actual value.
-        let (loan, _) = split_amount(amount_out, LTV);
+        let mut bonus_ltv: u8 = 0;
+
+        if (*vec_map::get(&state.has_staked_frens, &sender)) {
+            bonus_ltv = bonus_ltv + 10; // 10 percent
+        };
+
+        let (loan, _) = split_amount(amount_out, (LTV + bonus_ltv));
 
         // Convert this orbital address to type bytes32.
         let from_contract_id: address = @orbital;
 
         // Get the destination orbital address in bytes32.
-        let to_contract_id: address = *vec_map::get(&state.orbitals, &to_chain_id);
+        let to_contract_id: address = *vec_map::get(&state.foreign_orbitals, &to_chain_id);
 
         // Truncate to seconds.
         let timestamp = clock::timestamp_ms(the_clock) / 1000;
@@ -293,7 +308,6 @@ module orbital::orbital {
                 id: object::new(ctx),
                 loan_id: loan_id,
                 sender: sender,
-                coin_type: coin_type,
                 coin_in_value: coin_in_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
@@ -346,7 +360,7 @@ module orbital::orbital {
         let from_contract_id: address = @orbital;
 
         // Get the destination orbital address in bytes32.
-        let to_contract_id: address = *vec_map::get(&state.orbitals, &loan.to_chain_id);
+        let to_contract_id: address = *vec_map::get(&state.foreign_orbitals, &loan.to_chain_id);
 
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
@@ -380,7 +394,53 @@ module orbital::orbital {
         // Update loan state.
         loan.state = LoanStateSETTLED;
 
+        // Update nonce tracker.
+        state.wormhole_nonce = state.wormhole_nonce + 1;
+
         true
+    }
+
+    public entry fun stake_sui_frens(
+        state: &mut State,
+        status: bool,
+        coin_gas: Coin<SUI>, // Message fee.
+        wormhole_state: &mut WormholeState,
+        the_clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+
+        // Build an inter-chain message.
+        let mut payload = vector::empty<u8>();
+        vector::append(&mut payload, ON_AMPLIFY_METHOD);
+        vector::append(&mut payload, to_bytes<address>(&sender));
+        vector::append(&mut payload, to_bytes<bool>(&status));
+
+        // Get wormhole messgase fee.
+        let wormhole_fee_value: u64 = message_fee(wormhole_state);
+        
+        // Get the input gas fee.
+        let coin_gas_value = coin::value(&coin_gas);
+
+        // Check the input coin value is enough for message fee.
+        assert!(coin_gas_value >= wormhole_fee_value, EZeroAmount);
+
+        // Publish message on wormhole guardian.
+        publish_message(
+            wormhole_state,
+            coin_gas, // Pay wormhole message fee.
+            prepare_message(
+                &mut state.emitter_cap, 
+                state.wormhole_nonce, 
+                payload
+            ),
+            the_clock
+        );
+
+        // Update nonce tracker.
+        state.wormhole_nonce = state.wormhole_nonce + 1;
+        
+        state.has_staked_frens.insert(sender, status);
     }
 
     // This function receives borrow events from foreign orbitals.
@@ -393,7 +453,6 @@ module orbital::orbital {
         from_chain_id: u16,
         receiver: address,
         coin_out_value: u64,
-        coin_type: u8,
         the_clock: &Clock,        
         ctx: &mut TxContext
     ) {
@@ -418,7 +477,6 @@ module orbital::orbital {
             loan_id,
             from_chain_id,
             the_clock,
-            coin_type,
             coin_out_value,
             receiver,
             ctx
@@ -435,7 +493,6 @@ module orbital::orbital {
         nonce: u32,
         method: vector<u8>,
         loan: &mut Loan<X>,
-        coin_type: u8,      
         ctx: &mut TxContext
     ) {
         // Only admin function.
@@ -457,7 +514,6 @@ module orbital::orbital {
         let result: bool = on_repay<X>(
             state,
             loan,
-            coin_type,
             ctx
         );
 
@@ -474,7 +530,6 @@ module orbital::orbital {
         loan_id: vector<u8>,
         from_chain_id: u16,
         the_clock: &Clock,
-        coin_type: u8,
         coin_out_value: u64,
         receiver: address,
         ctx: &mut TxContext
@@ -496,7 +551,6 @@ module orbital::orbital {
                 id: object::new(ctx),
                 loan_id: loan_id,
                 receiver: receiver,
-                coin_type: coin_type,
                 coin_out_value: coin_out_value,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
@@ -511,7 +565,6 @@ module orbital::orbital {
     fun on_repay<X>(
         state: &mut State,
         loan: &mut Loan<X>,
-        coin_type: u8,
         ctx: &mut TxContext
     ) : bool {
         // Check if loan is still active.
@@ -536,8 +589,11 @@ module orbital::orbital {
 
     /// @dev helper functions
 
-    fun is_token_supported(supported_tokens: VecSet<address>, coin_id: address): bool {
-        vec_set::contains(&supported_tokens, &coin_id)
+    fun is_coin_supported<T>(supported_coins: VecSet<String>): bool {
+        // Get pool
+        let coin_id = get_coin_id<T>();
+
+        vec_set::contains(&supported_coins, &coin_id)
     }
 
     fun estimate_interest(

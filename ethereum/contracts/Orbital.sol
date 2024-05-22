@@ -7,7 +7,6 @@ import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
 import {AddressToBytes32} from "./libraries/AddressToBytes32.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import {IWormhole} from "wormhole-solidity-sdk/interfaces/IWormhole.sol";
@@ -16,12 +15,14 @@ contract Orbital is IOrbital, Ownable2Step {
     using AddressToBytes32 for bytes32;
     using AddressToBytes32 for address;
 
+    uint256 private constant ONE_YEAR = 31_536_000;
+
     /// @notice cross chain method identifier.
     bytes32 private ON_BORROW_METHOD =
         0x4f4e5f424f52524f575f4d4554484f4400000000000000000000000000000000;
     bytes32 private ON_REPAY_METHOD =
         0x4f4e5f52455041595f4d4554484f440000000000000000000000000000000000;
-    bytes32 private ON_DEFAULT_METHOD =
+    bytes32 private ON_AMPLIFY_METHOD =
         0x4f4e5f44454641554c545f4d4554484f44000000000000000000000000000000;
 
     /// @notice Keeps wormhole dispatches.
@@ -42,22 +43,22 @@ contract Orbital is IOrbital, Ownable2Step {
     /// @notice Keeps tracks of foreign loans.
     mapping(bytes32 => ForeignLoan) private _foreignLoans;
 
+    /// @notice Keeps tracks of staked sui frends nft.
+    mapping(bytes32 => bool) private _hasStakedFrens;
+
     /// @dev interest rate is in basis points (0.01%)
     /// @notice Keeps tracks of tokens and their interest rate.
     mapping(bytes32 => uint256) private _interestRates;
 
     /// @notice
-    address[] private _supportedTokens;
-
-    /// @notice
-    address[] private _supportedNfts;
+    bytes32[] private _supportedTokens;
 
     /// @notice PriceFeeds - using by pyth network.
     IPriceFeeds private _priceFeeds;
 
     /// @notice Wormhole deps
     IWormhole private immutable _wormhole;
-    uint8 private constant CONSISTENCY_LEVEL = 200;
+    uint8 private constant CONSISTENCY_LEVEL = 0;
 
     ////////////////////////////////
     ////      CONSTRUCTOR       ////
@@ -69,45 +70,108 @@ contract Orbital is IOrbital, Ownable2Step {
         _wormhole = IWormhole(wormhole);
     }
 
+    function addForeignOrbital(
+        uint16 chainId,
+        bytes32 orbital
+    ) external onlyOwner {
+        _orbitals[chainId] = orbital;
+    }
+
+    function addSupportedToken(address token) external onlyOwner {
+        _supportedTokens.push(token.addressToBytes32());
+    }
+
     /// @notice
     function borrow(
         uint16 toChainId,
         bytes32 tokenIn,
         bytes32 tokenOut,
-        TokenType tokenType,
         uint256 value,
         bytes32 receiver
     ) external payable returns (bytes32) {
         address sender = _msgSender();
 
-        /// @notice Take loan with erc20 tokens.
-        if (tokenType == TokenType.TOKEN) {
-            return
-                _borrowWithFungibleTokens(
-                    sender,
-                    toChainId,
-                    tokenIn,
-                    tokenOut,
-                    value,
-                    receiver
-                );
+        /// @notice Check if the tokens are supported.
+        require(_isTokenSupported(tokenIn), "Token in not supported");
+
+        require(_isTokenSupported(tokenOut), "Token out not supported");
+
+        /// @notice Convert input token to solidity address.
+        address tokenInAddress = tokenIn.bytes32ToAddress();
+
+        /// @notice Transfer tokens to vault.
+        IERC20 token = IERC20(tokenInAddress);
+        token.transferFrom(sender, address(this), value);
+
+        /// @notice Get input amount equivalent of output amount.
+        uint256 amountOut = _priceFeeds.estimateFromTo(
+            tokenIn,
+            tokenOut,
+            value
+        );
+
+        /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
+        uint8 bonusLtv = 0;
+
+        if (_hasStakedFrens[sender.addressToBytes32()]) {
+            bonusLtv += 10; // 10 percent
         }
-        /// @notice Take loan with erc721 tokens.
-        else if (tokenType == TokenType.NFT) {
-            return
-                _borrowWithNonFungibleTokens(
-                    sender,
-                    toChainId,
-                    tokenIn,
-                    tokenOut,
-                    value,
-                    receiver
-                );
-        }
-        /// @notice Otherwise throw errors.
-        else {
-            revert("Undefined method");
-        }
+
+        (uint256 loan, ) = _splitAmount(amountOut, LTV + bonusLtv);
+
+        /// @notice Get wormhole messgase fee.
+        uint256 wormholeFee = _wormhole.messageFee();
+
+        /// @notice Check if gas supplied is enough for wormhole operation.
+        require(msg.value >= wormholeFee, "Insufficient message fee");
+
+        /// @notice Convert this orbital address to type bytes32.
+        bytes32 fromContractId = AddressToBytes32.addressToBytes32(
+            address(this)
+        );
+
+        /// @notice Get the destination orbital address in bytes32.
+        bytes32 toContractId = _orbitals[toChainId];
+
+        /// @notice Construct a unique loan identifier.
+        bytes32 loanId = keccak256(
+            abi.encode(sender, receiver, _wormholeNonce, block.timestamp)
+        );
+
+        /// @notice Build an inter-chain message.
+        bytes memory payload = abi.encode(
+            ON_BORROW_METHOD,
+            loanId,
+            sender.addressToBytes32(),
+            receiver,
+            toChainId,
+            fromContractId,
+            toContractId,
+            tokenOut,
+            loan
+        );
+
+        /// @notice Publish message on wormhole guardian.
+        _wormhole.publishMessage{value: wormholeFee}(
+            _wormholeNonce,
+            payload,
+            CONSISTENCY_LEVEL
+        );
+
+        /// @notice Save loan object.
+        _loans[loanId] = Loan({
+            sender: sender.addressToBytes32(),
+            tokenIn: tokenIn,
+            value: value,
+            state: LoanState.ACTIVE,
+            startSecs: block.timestamp
+        });
+
+        /// @notice Update nonce tracker.
+        _wormholeNonce++;
+
+        /// @notice Return the laon identifier for external systems.
+        return loanId;
     }
 
     function repay(bytes32 loanId) external payable returns (bool) {
@@ -124,28 +188,6 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Check the loan receiver is the sender.
         require(receiverAddress == sender, "Unauthorized loan");
-
-        /// @notice Repay loan with erc20 tokens.
-        if (loan.tokenType == TokenType.TOKEN) {
-            return _repayWithFungibleTokens(loanId, sender);
-        }
-        /// @notice Otherwise throw errors.
-        else {
-            revert("Undefined method");
-        }
-    }
-
-    ////////////////////////////////
-    ////         REPAY          ////
-    ////////////////////////////////
-
-    /// @notice This pay back the loan and send events for foreign tokens unlock.
-    function _repayWithFungibleTokens(
-        bytes32 loanId,
-        address sender
-    ) internal returns (bool) {
-        /// @notice Look up for foreign loan.
-        ForeignLoan storage loan = _foreignLoans[loanId];
 
         /// @notice Calculate the interest accrued.
         uint256 interest = _estimateInterest(
@@ -207,7 +249,6 @@ contract Orbital is IOrbital, Ownable2Step {
         uint16 fromChainId,
         bytes32 fromContractId,
         bytes32 tokenOut,
-        TokenType tokenType,
         uint256 value
     ) external override onlyOwner {
         /// @notice Check if nonce was executed.
@@ -220,7 +261,6 @@ contract Orbital is IOrbital, Ownable2Step {
                 fromChainId,
                 fromContractId,
                 tokenOut,
-                tokenType,
                 value
             );
         } else {
@@ -250,6 +290,13 @@ contract Orbital is IOrbital, Ownable2Step {
         _executeds[wormholeNonce] = true;
     }
 
+    function receiveOnStakeSuiFrens(
+        bytes32 sender,
+        bool status
+    ) external override onlyOwner {
+        _hasStakedFrens[sender] = status;
+    }
+
     /// @notice Thus function receives borrow events from foreign orbitals.
     function onBorrow(
         bytes32 loanId,
@@ -257,7 +304,6 @@ contract Orbital is IOrbital, Ownable2Step {
         uint16 fromChainId,
         bytes32 fromContractId,
         bytes32 tokenOut,
-        TokenType tokenType,
         uint256 value // Can be amount for erc20 or tokenId for erc721.
     ) internal returns (bool) {
         /// @notice Check the foreign orbital is correct.
@@ -289,7 +335,6 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Create the foreign loan.
         _foreignLoans[loanId] = ForeignLoan({
             receiver: receiver,
-            tokenType: tokenType,
             tokenOut: tokenOut,
             value: value,
             state: LoanState.ACTIVE,
@@ -309,207 +354,6 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Check if loan is still active.
         require(loan.state == LoanState.ACTIVE, "Loan is not active");
 
-        if (loan.tokenType == TokenType.TOKEN) {
-            return _onRepayWithFungibleTokens(loanId);
-        }
-        /// @notice
-        else if (loan.tokenType == TokenType.NFT) {
-            return _onRepayWithNonFungibleTokens(loanId);
-        }
-        /// @notice
-        else {
-            revert("Undefined method");
-        }
-    }
-
-    /// @dev Private functions for borrow.
-
-    ////////////////////////////////
-    ////         BORROW         ////
-    ////////////////////////////////
-
-    /// @notice
-    function _borrowWithFungibleTokens(
-        address sender,
-        uint16 toChainId,
-        bytes32 tokenIn,
-        bytes32 tokenOut,
-        uint256 amountIn,
-        bytes32 receiver
-    ) internal returns (bytes32) {
-        /// @notice Convert input token to solidity address.
-        address tokenInAddress = tokenIn.bytes32ToAddress();
-
-        /// @notice Check if the token is supported.
-        require(_isTokenSupported(tokenInAddress), "Token not supported");
-
-        /// @notice Transfer tokens to vault.
-        IERC20 token = IERC20(tokenInAddress);
-        token.transferFrom(sender, address(this), amountIn);
-
-        /// @notice Get input amount equivalent of output amount.
-        uint256 amountOut = _priceFeeds.estimateFromTo(
-            tokenIn,
-            tokenOut,
-            amountIn
-        );
-
-        /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
-        (uint256 loan, ) = _splitAmount(amountOut, LTV);
-
-        /// @notice Get wormhole messgase fee.
-        uint256 wormholeFee = _wormhole.messageFee();
-
-        /// @notice Check if gas supplied is enough for wormhole operation.
-        require(msg.value == wormholeFee, "Insufficient message fee");
-
-        /// @notice Convert this orbital address to type bytes32.
-        bytes32 fromContractId = AddressToBytes32.addressToBytes32(
-            address(this)
-        );
-
-        /// @notice Get the destination orbital address in bytes32.
-        bytes32 toContractId = _orbitals[toChainId];
-
-        /// @notice Construct a unique loan identifier.
-        bytes32 loanId = keccak256(
-            abi.encode(sender, receiver, _wormholeNonce, block.timestamp)
-        );
-
-        /// @notice Build an inter-chain message.
-        bytes memory payload = abi.encode(
-            ON_BORROW_METHOD,
-            loanId,
-            sender.addressToBytes32(),
-            receiver,
-            toChainId,
-            fromContractId,
-            toContractId,
-            tokenOut,
-            loan
-        );
-
-        /// @notice Publish message on wormhole guardian.
-        _wormhole.publishMessage{value: wormholeFee}(
-            _wormholeNonce,
-            payload,
-            CONSISTENCY_LEVEL
-        );
-
-        /// @notice Save loan object.
-        _loans[loanId] = Loan({
-            sender: sender.addressToBytes32(),
-            tokenType: TokenType.TOKEN,
-            tokenIn: tokenIn,
-            value: amountIn,
-            state: LoanState.ACTIVE,
-            startSecs: block.timestamp
-        });
-
-        /// @notice Update nonce tracker.
-        _wormholeNonce++;
-
-        /// @notice Return the laon identifier for external systems.
-        return loanId;
-    }
-
-    /// @notice
-    function _borrowWithNonFungibleTokens(
-        address sender,
-        uint16 toChainId,
-        bytes32 nftIn,
-        bytes32 tokenOut,
-        uint256 tokenId,
-        bytes32 receiver
-    ) internal returns (bytes32) {
-        /// @notice Convert input token to solidity address.
-        address tokenInAddress = nftIn.bytes32ToAddress();
-
-        /// @notice Check if the token is supported.
-        require(_isNftSupported(tokenInAddress), "Token not supported");
-
-        /// @notice Extract nft from sender.
-        IERC721 nft = IERC721(tokenInAddress);
-        nft.transferFrom(sender, address(this), tokenId);
-
-        /// @notice Get input amount equivalent of output amount.
-        uint256 amountOut = _priceFeeds.estimateFromTo(
-            nftIn,
-            tokenOut,
-            1 // calculating for 1 nft unit.
-        );
-
-        /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
-        (uint256 loan, ) = _splitAmount(amountOut, LTV);
-
-        /// @notice Get wormhole messgase fee.
-        uint256 wormholeFee = _wormhole.messageFee();
-
-        /// @notice Check if gas supplied is enough for wormhole operation.
-        require(msg.value == wormholeFee, "Insufficient message fee");
-
-        /// @notice Convert this orbital address to type bytes32.
-        bytes32 fromContractId = AddressToBytes32.addressToBytes32(
-            address(this)
-        );
-
-        /// @notice Get the destination orbital address in bytes32.
-        bytes32 toContractId = _orbitals[toChainId];
-
-        /// @notice Construct a unique loan identifier.
-        bytes32 loanId = keccak256(
-            abi.encode(sender, receiver, _wormholeNonce, block.timestamp)
-        );
-
-        /// Build inter-chain message.
-        bytes memory payload = abi.encode(
-            ON_REPAY_METHOD,
-            loanId,
-            sender.addressToBytes32(),
-            receiver,
-            toChainId,
-            fromContractId,
-            toContractId,
-            tokenOut,
-            loan
-        );
-
-        /// @notice Publish message on wormhole infra.
-        _wormhole.publishMessage{value: wormholeFee}(
-            _wormholeNonce,
-            payload,
-            CONSISTENCY_LEVEL
-        );
-
-        /// @notice Save loan object.
-        _loans[loanId] = Loan({
-            sender: sender.addressToBytes32(),
-            tokenType: TokenType.NFT,
-            tokenIn: nftIn,
-            value: tokenId,
-            state: LoanState.ACTIVE,
-            startSecs: block.timestamp
-        });
-
-        /// @notice Update nonce tracker.
-        _wormholeNonce++;
-
-        /// @notice Return the laon identifier for external systems.
-        return loanId;
-    }
-
-    ////////////////////////////////
-    ////         REPAY          ////
-    ////////////////////////////////
-
-    /// @dev Private functions for repay.
-
-    function _onRepayWithFungibleTokens(
-        bytes32 loanId
-    ) internal returns (bool) {
-        /// @notice Lookup for loan.
-        Loan storage loan = _loans[loanId];
-
         /// @notice Convert input token to solidity address.
         address tokenInAddress = loan.tokenIn.bytes32ToAddress();
 
@@ -526,44 +370,12 @@ contract Orbital is IOrbital, Ownable2Step {
         return true;
     }
 
-    function _onRepayWithNonFungibleTokens(
-        bytes32 loanId
-    ) internal returns (bool) {
-        /// @notice Lookup for loan.
-        Loan storage loan = _loans[loanId];
-
-        /// @notice Convert input token to solidity address.
-        address tokenInAddress = loan.tokenIn.bytes32ToAddress();
-
-        /// @notice Convert nft receiver address to evm address.
-        address receiver = loan.sender.bytes32ToAddress();
-
-        /// @notice Transfer back locked nft to sender.
-        IERC721 nft = IERC721(tokenInAddress);
-        nft.transferFrom(receiver, address(this), loan.value);
-
-        /// @notice Update loan status.
-        loan.state = LoanState.SETTLED;
-
-        return true;
-    }
-
     ////////////////////////////////
     ////   PRIVATE FUNCTIONS    ////
     ////////////////////////////////
 
-    /// @notice Check if NFT is supported.
-    function _isNftSupported(address tokenId) public view returns (bool) {
-        for (uint256 i = 0; i < _supportedNfts.length; i++) {
-            if (_supportedNfts[i] == tokenId) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /// @notice Check if Token is supported.
-    function _isTokenSupported(address tokenId) public view returns (bool) {
+    function _isTokenSupported(bytes32 tokenId) public view returns (bool) {
         for (uint256 i = 0; i < _supportedTokens.length; i++) {
             if (_supportedTokens[i] == tokenId) {
                 return true;
@@ -596,7 +408,7 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice interestRate is in basis points (0.01%)
         uint256 interest = (value * interestRate * duration) /
-            (100 * 365 days * 24 * 60 * 60);
+            (100 * ONE_YEAR * 24 * 60 * 60);
 
         return interest;
     }

@@ -8,14 +8,9 @@ interface IOrbital {
         SETTLED,
         DEFAULTED
     }
-    enum TokenType {
-        TOKEN,
-        NFT
-    }
 
     struct Loan {
         bytes32 sender;
-        TokenType tokenType;
         bytes32 tokenIn;
         uint256 value; // Can be amount for erc20 or tokenId for erc721.
         LoanState state;
@@ -24,7 +19,6 @@ interface IOrbital {
 
     struct ForeignLoan {
         bytes32 receiver;
-        TokenType tokenType;
         bytes32 tokenOut;
         uint256 value; // Can be amount for erc20 or tokenId for erc721.
         LoanState state;
@@ -37,7 +31,6 @@ interface IOrbital {
         uint16 toChainId,
         bytes32 tokenIn,
         bytes32 tokenOut,
-        TokenType tokenType,
         uint256 value,
         bytes32 receiver
     ) external payable returns (bytes32);
@@ -50,7 +43,6 @@ interface IOrbital {
         uint16 fromChainId,
         bytes32 fromContractId,
         bytes32 tokenOut,
-        TokenType tokenType,
         uint256 value
     ) external;
 
@@ -59,4 +51,6 @@ interface IOrbital {
         bytes32 method,
         bytes32 loanId
     ) external;
+
+    function receiveOnStakeSuiFrens(bytes32 sender, bool status) external;
 }

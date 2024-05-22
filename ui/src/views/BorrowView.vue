@@ -16,7 +16,7 @@ const loan = ref({
   amountIn: undefined,
   amountOut: undefined,
   tokenType: 0,
-  fromChainId: 5,
+  fromChainId: 6,
   toChainId: 21,
   collateral: 'USDT',
   principal: 'BTC',
@@ -132,7 +132,7 @@ const loan = ref({
                         <p>0.1 BTC</p>
                       </div>
                       <div class="chain">
-                        <img src="/images/polygon.png" alt="">
+                        <img src="/images/avax.png" alt="">
                         <p>Polygon</p>
                       </div>
                     </div>

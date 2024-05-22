@@ -1,9 +1,8 @@
 import * as dotenv from "dotenv";
-// import Web3 from 'web3';
+import Web3 from 'web3';
 
-// import { TransactionBlock } from '@mysten/sui.js/transactions';
-// import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
-// import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
 
 // import ethOrbitalAbi from "./abis/ethereum/orbital.json";
 
@@ -26,10 +25,10 @@ import {
     StandardRelayerApp,
     StandardRelayerContext,
 } from "@wormhole-foundation/relayer-engine";
-import { CHAIN_ID_SUI, CHAIN_ID_POLYGON } from "@certusone/wormhole-sdk";
+import { CHAIN_ID_SUI, CHAIN_ID_AVAX, hexToUint8Array } from "@certusone/wormhole-sdk";
 
-const ORBITAL_SUI = "0xec0593d7404f2fff3cc79c5bf27348b88b7324b6db4c084e848dd819baf29c37";
-const ORBITAL_POLYGON = "";
+const ORBITAL_SUI = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd";
+const ORBITAL_AVAX = "0xdBFc47ccd46BfACa4141c9372028fF09008DAd11";
 
 /// @notice cross chain method identifier.
 const ON_BORROW_METHOD =
@@ -38,7 +37,7 @@ const ON_BORROW_METHOD =
 const ON_REPAY_METHOD =
     "0x4f4e5f52455041595f4d4554484f440000000000000000000000000000000000";
 
-const ON_DEFAULT_METHOD =
+const ON_AMPLIFY_METHOD =
     "0x4f4e5f44454641554c545f4d4554484f44000000000000000000000000000000";
 
 (async function main() {
@@ -50,7 +49,7 @@ const ON_DEFAULT_METHOD =
             missedVaaOptions: {
                 startingSequenceConfig: {
                     '21': BigInt(1), /* sui */
-                    '5': BigInt(1) /* polygon */
+                    '6': BigInt(1) /* avalanche */
                 }
             }
         },
@@ -61,7 +60,7 @@ const ON_DEFAULT_METHOD =
     app.multiple(
         {
             [CHAIN_ID_SUI]: ORBITAL_SUI,
-            // [CHAIN_ID_POLYGON]: ORBITAL_POLYGON
+            [CHAIN_ID_AVAX]: ORBITAL_AVAX
         },
         async (ctx) => {
             const vaa = ctx.vaa;
@@ -69,24 +68,39 @@ const ON_DEFAULT_METHOD =
 
             if (!vaa?.payload) return;
 
-            console.log(`⚡ Got VAA: from chain id ${vaa?.emitterChain}`, vaa?.payload.toString('hex'));
-
             if (vaa?.emitterChain == CHAIN_ID_SUI) {
-                // const transactionId = await signTransactionOnEth(
-                //     vaa.nonce, vaa?.payload.toString('hex')
-                // );
-
-                console.log('⚡From TxID: ', hash);
-                // console.log('⚡To TxID: ', transactionId);
+                console.log('⚡Got VAA: ', vaa?.payload.toString('hex'));
             }
             // Emitted for base chain
-            else if (vaa?.emitterChain == CHAIN_ID_POLYGON) {
-                // const transactionId = await signTransactionOnSui(
-                //     vaa.nonce, vaa?.payload.toString('hex')
-                // );
+            else if (vaa?.emitterChain == CHAIN_ID_AVAX) {
+                const web3 = new Web3();
 
-                console.log('⚡From TxID: ', hash);
-                // console.log('⚡To TxID: ', transactionId);
+                const hexPayload = '0x' + vaa?.payload.toString('hex');
+
+                if (hexPayload.startsWith(ON_BORROW_METHOD)) {
+                    const params = web3.eth.abi.decodeParameters(
+                        ['bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'bytes32', 'uint256'],
+                        hexPayload
+                    );
+
+                    // signOnBorrowTransactionOnSui(
+                    //     vaa.nonce,
+                    //     params[3],
+                    //     params[1],
+                    //     CHAIN_ID_AVAX,
+                    //     params[8],
+                    //     getCoinType(params[7])
+                    // );
+                }
+
+                if (hexPayload.startsWith(ON_REPAY_METHOD)) {
+
+                }
+
+                if (hexPayload.startsWith(ON_AMPLIFY_METHOD)) {
+
+                }
+
             }
             // Otherwise ~ error
             else {
@@ -134,23 +148,46 @@ const ON_DEFAULT_METHOD =
     console.log(`[server]: Server running at http://${hostname}:${port}`);
 })();
 
-// async function signTransactionOnSui(nonce: number, payload: string): Promise<string | null> {
-//     // use getFullnodeUrl to define Devnet RPC location
-//     const rpcUrl = getFullnodeUrl('devnet');
+const ownerCap: string = "0x202796a6237ab8e4a6bb7fdd77cd7477fad08f1965085b790296eded2d1443fb";
+const state: string = "0xa340666496beed25da5cc167507f211f92cfedc8fd182dea645984f26c9eeb1e";
+const theClock: string = "";
+const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
+const oracleHolder: string = "0x7ab6aa7c4f8ec79c630dc560ae34bd745a035c5a9ab9143b90b504399a4f1040";
+const priceFeedsState: string = "0x355075b86c56bb4ca1144365a9abb044a5acca48e6439bdf0a83c66252e0035a";
+
+// async function signOnBorrowTransactionOnSui(
+//     nonce: number,
+//     receiver: string,
+//     loanId: string,
+//     fromChainId: number,
+//     coinOutValue: number,
+//     coinOutType: string
+// ): Promise<string | null> {
+//     const rpcUrl = getFullnodeUrl('testnet');
 
 //     // create a client connected to devnet
 //     const client = new SuiClient({ url: rpcUrl });
-
-//     const target: `${string}::${string}::${string}` = extractSuiTarget(payload);
-//     const targetArguments: string[] = extractSuiArguments(nonce, payload);
 
 //     try {
 //         const txb = new TransactionBlock();
 
 //         txb.moveCall({
-//             target: `${ORBITAL_SUI}::orbital::receive_message`,
+//             target: `${ORBITAL_SUI}::orbital::receive_on_borrow`,
 //             // object IDs must be wrapped in moveCall arguments
-//             arguments: targetArguments,
+//             arguments: [
+//                 txb.object(ownerCap),
+//                 txb.object(state),
+//                 txb.pure(nonce),
+//                 txb.pure(hexToUint8Array(ON_BORROW_METHOD)),
+//                 txb.pure(hexToUint8Array(loanId)),
+//                 txb.pure(fromChainId),
+//                 txb.pure(receiver),
+//                 txb.pure(coinOutValue),
+//                 txb.object(theClock)
+//             ],
+//             typeArguments: [
+//                 coinOutType
+//             ]
 //         });
 
 //         const result = await client.signAndExecuteTransactionBlock(
@@ -213,56 +250,24 @@ const ON_DEFAULT_METHOD =
 
 // Extraction methods
 
-function extractSuiTarget(payload: string): string {
-    if (true) {
-
-        return ON_BORROW_METHOD;
+function getCoinType(tokenId: string): string {
+    // BTC
+    if (tokenId == '0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517') {
+        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT";
     }
 
-    if (true) {
-
-        return ON_REPAY_METHOD;
+    if (tokenId == '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT') {
+        return "0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517";
     }
 
-    if (true) {
-
-        return ON_DEFAULT_METHOD;
+    // USDT
+    if (tokenId == '0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517') {
+        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC";
     }
 
-    return '';
-}
-
-function extractEthMethod(payload: string): string {
-    if (true) {
-
-        return ON_BORROW_METHOD;
+    if (tokenId == '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC') {
+        return "0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517";
     }
 
-    if (true) {
-
-        return ON_REPAY_METHOD;
-    }
-
-    if (true) {
-
-        return ON_DEFAULT_METHOD;
-    }
-
-    return '';
-}
-
-function extractArguments(nonce: number, payload: string): string {
-    if (true) {
-        return '';
-    }
-
-    if (true) {
-        return '';
-    }
-
-    if (true) {
-        return '';
-    }
-
-    return '';
+    return "";
 }
