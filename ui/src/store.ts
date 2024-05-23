@@ -6,6 +6,7 @@ import { createStore, Store } from 'vuex';
 export interface State {
     ethAddress: string;
     suiAddress: string;
+    suiAdapter: any;
 }
 
 // define injection key
@@ -15,6 +16,7 @@ export const store = createStore<State>({
     state: {
         ethAddress: null,
         suiAddress: null,
+        suiAdapter: null
     },
     mutations: {
         setEthAddress(state: State, newAddress: string) {
@@ -22,6 +24,9 @@ export const store = createStore<State>({
         },
         setSuiAddress(state: State, newAddress: string) {
             state.suiAddress = newAddress;
+        },
+        setSuiAdapter(state: State, newAdapter: string) {
+            state.suiAdapter = newAdapter;
         },
     }
 });

@@ -202,7 +202,7 @@ const ON_AMPLIFY_METHOD =
 
         if (['GET', 'POST'].indexOf(request.method!!) > -1) {
             response.writeHead(200, headers);
-            response.end(JSON.stringify({ 'status': true }), 'utf-8');
+            response.end(JSON.stringify({ 'status': "OK" }), 'utf-8');
             return;
         }
 

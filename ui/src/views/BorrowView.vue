@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { chain, token } from '@/scripts/chains';
+import { ethBorrow, ethRepay, suiBorrow, suiRepay } from '@/scripts/loan';
+import Converter from '@/scripts/converter';
+// @ts-ignore
+import { useStore } from 'vuex';
+import { key } from '../store';
+
+const store = useStore(key);
 
 const interchange = () => {
   let toTemp: number | null = loan.value.toChainId;
@@ -12,6 +19,9 @@ const interchange = () => {
   toTemp = null;
 };
 
+const borrowing = ref(false);
+const repaying = ref(null);
+
 const loan = ref({
   amountIn: undefined,
   amountOut: undefined,
@@ -22,6 +32,114 @@ const loan = ref({
   principal: 'BTC',
   interchange: false
 });
+
+const borrow = async () => {
+  if (!store.state.ethAddress || !store.state.suiAddress) {
+
+    return;
+  }
+
+  if (borrowing.value) {
+    return;
+  }
+
+  if (!loan.value.amountIn || loan.value.amountIn == 0) {
+
+    return;
+  }
+
+  // Check for Avalanche
+  if (loan.value.fromChainId == 6) {
+    borrowing.value = true;
+
+    const tx = await ethBorrow(
+      loan.value.toChainId,
+      token(loan.value.collateral)!.addresses[6],
+      token(loan.value.principal)!.addresses[6],
+      Converter.toWei(loan.value.amountIn),
+      store.state.suiAddress
+    );
+
+    if (tx) {
+
+    } else {
+
+    }
+
+    borrowing.value = false;
+  }
+
+  // Check for SUI
+  if (loan.value.fromChainId == 21) {
+    borrowing.value = true;
+
+    const tx = await suiBorrow(
+      loan.value.toChainId,
+      Converter.toWei(loan.value.amountIn),
+      token(loan.value.collateral)!.addresses[21],
+      token(loan.value.principal)!.addresses[21],
+      store.state.suiAddress,
+      store.state.suiAdapter
+    );
+
+    if (tx) {
+
+    } else {
+
+    }
+
+    borrowing.value = false;
+  }
+};
+
+const repay = async (loan: any, index: number) => {
+  if (!store.state.ethAddress || !store.state.suiAddress) {
+
+    return;
+  }
+
+  if (repaying.value) {
+    return;
+  }
+
+  // Check for Avalanche. @reversed
+  if (loan.fromChainId == 21) {
+    repaying.value == index;
+
+    const tx = await ethRepay(loan.loanId);
+
+    if (tx) {
+
+    } else {
+
+    }
+
+    repaying.value == null;
+  }
+
+  // Check for SUI. @reversed
+  if (loan.fromChainId == 6) {
+    repaying.value == index;
+
+    // Calcalute estimated interest plus principal.
+    const coinOutValue = "1000";
+
+    const tx = await suiRepay(
+      loan.loanId,
+      Converter.toWei(coinOutValue),
+      token(loan.value.principal)!.addresses[21],
+      store.state.suiAdapter
+    );
+
+    if (tx) {
+
+    } else {
+
+    }
+
+    repaying.value == null;
+  }
+};
 </script>
 
 <template>
@@ -105,7 +223,7 @@ const loan = ref({
             </div>
 
             <div class="action">
-              <button>Borrow</button>
+              <button @click="borrow">Borrow</button>
             </div>
           </div>
         </div>
@@ -123,7 +241,7 @@ const loan = ref({
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="index in 1" :key="index">
+                <tr v-for="loan, index in 1" :key="index">
                   <td>{{ index }}</td>
                   <td>
                     <div class="table_collateral">
@@ -150,7 +268,7 @@ const loan = ref({
                     </div>
                   </td>
                   <td>
-                    <button>Repay</button>
+                    <button @click="repay(loan, index)">Repay</button>
                   </td>
                 </tr>
               </tbody>

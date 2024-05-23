@@ -42,8 +42,8 @@
                     </div>
                 </div>
             </header>
-            <SignInWithSui ref="sui" :visible="false" defaultChain="sui:testnet" @connected="onSuiConnected"
-                @disconnected="onSuiDisConnected" />
+            <SignInWithSui ref="sui" :visible="false" defaultChain="sui:testnet" @adapter="onAdapter"
+                @connected="onSuiConnected" @disconnected="onSuiDisConnected" />
         </div>
     </section>
 </template>
@@ -71,6 +71,10 @@ const onSuiConnected = (address: string) => {
 
 const onSuiDisConnected = () => {
     store.commit('setSuiAddress', null);
+};
+
+const onAdapter = (adapter: any) => {
+    store.commit('setSuiAdapter', adapter);
 };
 
 createWeb3Modal({

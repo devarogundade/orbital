@@ -56,28 +56,9 @@ export const abi = [
     {
         "inputs": [
             {
-                "internalType": "address",
+                "internalType": "bytes32",
                 "name": "tokenId",
-                "type": "address"
-            }
-        ],
-        "name": "_isNftSupported",
-        "outputs": [
-            {
-                "internalType": "bool",
-                "name": "",
-                "type": "bool"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "address",
-                "name": "tokenId",
-                "type": "address"
+                "type": "bytes32"
             }
         ],
         "name": "_isTokenSupported",
@@ -102,6 +83,37 @@ export const abi = [
         "inputs": [
             {
                 "internalType": "uint16",
+                "name": "chainId",
+                "type": "uint16"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "orbital",
+                "type": "bytes32"
+            }
+        ],
+        "name": "addForeignOrbital",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            }
+        ],
+        "name": "addSupportedToken",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint16",
                 "name": "toChainId",
                 "type": "uint16"
             },
@@ -114,11 +126,6 @@ export const abi = [
                 "internalType": "bytes32",
                 "name": "tokenOut",
                 "type": "bytes32"
-            },
-            {
-                "internalType": "enum IOrbital.TokenType",
-                "name": "tokenType",
-                "type": "uint8"
             },
             {
                 "internalType": "uint256",
@@ -206,11 +213,6 @@ export const abi = [
                 "type": "bytes32"
             },
             {
-                "internalType": "enum IOrbital.TokenType",
-                "name": "tokenType",
-                "type": "uint8"
-            },
-            {
                 "internalType": "uint256",
                 "name": "value",
                 "type": "uint256"
@@ -240,6 +242,34 @@ export const abi = [
             }
         ],
         "name": "receiveOnRepay",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint32",
+                "name": "wormholeNonce",
+                "type": "uint32"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "method",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "receiver",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bool",
+                "name": "status",
+                "type": "bool"
+            }
+        ],
+        "name": "receiveOnStakeSuiFrens",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
