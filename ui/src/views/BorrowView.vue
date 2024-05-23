@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { chain, token } from '@/scripts/chains';
-import { ethBorrow, ethRepay, suiBorrow, suiRepay } from '@/scripts/loan';
+import { defaultInterestRate, ethBorrow, ethRepay, suiBorrow, suiRepay } from '@/scripts/loan';
 import Converter from '@/scripts/converter';
 // @ts-ignore
 import { useStore } from 'vuex';
 import { key } from '../store';
 import type { Loan } from '@/types';
+import { getAllLoans, saveNewLoan } from '@/scripts/storage';
 
 const store = useStore(key);
 
@@ -42,8 +43,8 @@ const loan = ref<Loan>({
   collateral: 'USDT',
   principal: 'BTC',
   interchange: false,
-  interestRate: undefined,
-  startSecs: undefined
+  interestRate: undefined, // will be injected later
+  startSecs: undefined // will be injected later
 });
 
 const myLoans = ref<Loan[]>([]);
@@ -77,6 +78,10 @@ const borrow = async () => {
 
     if (tx) {
 
+      loan.value.interestRate = defaultInterestRate;
+      loan.value.startSecs = Number(Number(Date.now() / 1000).toFixed(0));
+
+      saveNewLoan(loan.value);
     } else {
 
     }
@@ -99,12 +104,17 @@ const borrow = async () => {
 
     if (tx) {
 
+      loan.value.interestRate = defaultInterestRate;
+      loan.value.startSecs = Number(Number(Date.now() / 1000).toFixed(0));
+
+      saveNewLoan(loan.value);
     } else {
 
     }
 
     borrowing.value = false;
   }
+
 };
 
 const repay = async (loan: any, index: number) => {
@@ -155,6 +165,10 @@ const repay = async (loan: any, index: number) => {
     repaying.value == null;
   }
 };
+
+onMounted(() => {
+  myLoans.value = getAllLoans();
+});
 </script>
 
 <template>

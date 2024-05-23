@@ -4,6 +4,8 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { abi as ethAbi } from '../contracts/eth';
 import { config } from './config';
 
+export const defaultInterestRate = 10000000000;
+
 const ORBITAL_SUI: string = "";
 export const ORBITAL_AVAX: `0x${string}` = '0x';
 
