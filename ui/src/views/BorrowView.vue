@@ -6,8 +6,19 @@ import Converter from '@/scripts/converter';
 // @ts-ignore
 import { useStore } from 'vuex';
 import { key } from '../store';
+import type { Loan } from '@/types';
 
 const store = useStore(key);
+
+const calculateInterest = (
+  value: number,
+  startSecs: number,
+  interestRate: number
+): number => {
+
+
+  return 0;
+};
 
 const interchange = () => {
   let toTemp: number | null = loan.value.toChainId;
@@ -19,10 +30,10 @@ const interchange = () => {
   toTemp = null;
 };
 
-const borrowing = ref(false);
-const repaying = ref(null);
+const borrowing = ref<boolean>(false);
+const repaying = ref<number | null>(null);
 
-const loan = ref({
+const loan = ref<Loan>({
   amountIn: undefined,
   amountOut: undefined,
   tokenType: 0,
@@ -30,8 +41,12 @@ const loan = ref({
   toChainId: 21,
   collateral: 'USDT',
   principal: 'BTC',
-  interchange: false
+  interchange: false,
+  interestRate: undefined,
+  startSecs: undefined
 });
+
+const myLoans = ref<Loan[]>([]);
 
 const borrow = async () => {
   if (!store.state.ethAddress || !store.state.suiAddress) {
@@ -56,7 +71,7 @@ const borrow = async () => {
       loan.value.toChainId,
       token(loan.value.collateral)!.addresses[6],
       token(loan.value.principal)!.addresses[6],
-      Converter.toWei(loan.value.amountIn),
+      Converter.toWei(loan.value.amountIn.toString()),
       store.state.suiAddress
     );
 
@@ -75,7 +90,7 @@ const borrow = async () => {
 
     const tx = await suiBorrow(
       loan.value.toChainId,
-      Converter.toWei(loan.value.amountIn),
+      Converter.toWei(loan.value.amountIn.toString()),
       token(loan.value.collateral)!.addresses[21],
       token(loan.value.principal)!.addresses[21],
       store.state.suiAddress,
@@ -241,13 +256,16 @@ const repay = async (loan: any, index: number) => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="loan, index in 1" :key="index">
+                <tr v-for="loan, index in myLoans" :key="index">
                   <td>{{ index }}</td>
                   <td>
                     <div class="table_collateral">
                       <div class="token">
-                        <img src="/images/btc.png" alt="">
-                        <p>0.1 BTC</p>
+                        <img :src="token(loan.collateral)!.image" alt="">
+                        <p>
+                          {{ Converter.toMoney(Converter.fromWei(loan.amountIn!.toString())) }}
+                          {{ token(loan.collateral)!.symbol }}
+                        </p>
                       </div>
                       <div class="chain">
                         <img src="/images/avax.png" alt="">
@@ -258,8 +276,12 @@ const repay = async (loan: any, index: number) => {
                   <td>
                     <div class="table_principal">
                       <div class="token">
-                        <img src="/images/usdt.png" alt="">
-                        <p>10 USDT</p>
+                        <img :src="token(loan.principal)!.image" alt="">
+                        <p>
+                          <!-- calculate interest instead -->
+                          {{ Converter.toMoney(Converter.fromWei(loan.amountIn!.toString())) }}
+                          {{ token(loan.principal)!.symbol }}
+                        </p>
                       </div>
                       <div class="chain">
                         <img src="/images/sui.png" alt="">
@@ -268,7 +290,9 @@ const repay = async (loan: any, index: number) => {
                     </div>
                   </td>
                   <td>
-                    <button @click="repay(loan, index)">Repay</button>
+                    <button @click="repay(loan, index)">
+                      {{ repaying?.valueOf() == index ? "Repay" : "Loading.." }}
+                    </button>
                   </td>
                 </tr>
               </tbody>
