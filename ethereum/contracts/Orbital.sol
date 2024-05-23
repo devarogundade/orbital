@@ -255,7 +255,7 @@ contract Orbital is IOrbital, Ownable2Step {
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
         if (method == ON_BORROW_METHOD) {
-            onBorrow(
+            bool result = onBorrow(
                 loanId,
                 receiver,
                 fromChainId,
@@ -263,12 +263,12 @@ contract Orbital is IOrbital, Ownable2Step {
                 tokenOut,
                 value
             );
+
+            /// @notice Update nonce as executed.
+            _executeds[wormholeNonce] = result;
         } else {
             revert("Undefined method");
         }
-
-        /// @notice Update nonce as executed.
-        _executeds[wormholeNonce] = true;
     }
 
     /// @dev Function will be trigger my orbital reyaler.
@@ -281,25 +281,37 @@ contract Orbital is IOrbital, Ownable2Step {
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
         if (method == ON_REPAY_METHOD) {
-            onRepay(loanId);
+            bool result = onRepay(loanId);
+
+            /// @notice Update nonce as executed.
+            _executeds[wormholeNonce] = result;
         } else {
             revert("Undefined method");
         }
-
-        /// @notice Update nonce as executed.
-        _executeds[wormholeNonce] = true;
     }
 
     function receiveOnStakeSuiFrens(
-        bytes32 sender,
+        uint32 wormholeNonce,
+        bytes32 method,
+        bytes32 receiver,
         bool status
     ) external override onlyOwner {
-        _hasStakedFrens[sender] = status;
+        /// @notice Check if nonce was executed.
+        require(!_executeds[wormholeNonce], "Nonce was already executed.");
+
+        if (method == ON_REPAY_METHOD) {
+            _hasStakedFrens[receiver] = status;
+
+            /// @notice Update nonce as executed.
+            _executeds[wormholeNonce] = true;
+        } else {
+            revert("Undefined method");
+        }
     }
 
     /// @notice Thus function receives borrow events from foreign orbitals.
     function onBorrow(
-        bytes32 loanId,
+        bytes32 foreignLoanId,
         bytes32 receiver,
         uint16 fromChainId,
         bytes32 fromContractId,
@@ -314,7 +326,7 @@ contract Orbital is IOrbital, Ownable2Step {
 
         /// @notice Check if foreign loan already exists.
         require(
-            _foreignLoans[loanId].state == LoanState.NONE,
+            _foreignLoans[foreignLoanId].state == LoanState.NONE,
             "Loan already created"
         );
 
@@ -333,7 +345,8 @@ contract Orbital is IOrbital, Ownable2Step {
         uint256 interestRate = _interestRates[tokenOut];
 
         /// @notice Create the foreign loan.
-        _foreignLoans[loanId] = ForeignLoan({
+        _foreignLoans[foreignLoanId] = ForeignLoan({
+            foreignLoanId: foreignLoanId,
             receiver: receiver,
             tokenOut: tokenOut,
             value: value,

@@ -18,6 +18,7 @@ interface IOrbital {
     }
 
     struct ForeignLoan {
+        bytes32 foreignLoanId;
         bytes32 receiver;
         bytes32 tokenOut;
         uint256 value; // Can be amount for erc20 or tokenId for erc721.
@@ -52,5 +53,10 @@ interface IOrbital {
         bytes32 loanId
     ) external;
 
-    function receiveOnStakeSuiFrens(bytes32 sender, bool status) external;
+    function receiveOnStakeSuiFrens(
+        uint32 wormholeNonce,
+        bytes32 method,
+        bytes32 receiver,
+        bool status
+    ) external;
 }

@@ -71,7 +71,6 @@ module orbital::orbital {
 
     public struct Loan<phantom X> has key, store {
         id: UID,
-        loan_id: vector<u8>,
         sender: address,
         coin_in_value: u64,
         state: u8,
@@ -80,7 +79,7 @@ module orbital::orbital {
 
     public struct ForeignLoan<phantom Y> has key, store {
         id: UID,
-        loan_id: vector<u8>,
+        foreign_loan_id: vector<u8>,
         receiver: address,
         coin_out_value: u64,
         state: u8,
@@ -264,16 +263,12 @@ module orbital::orbital {
         let timestamp = clock::timestamp_ms(the_clock) / 1000;
 
         // Construct a unique loan identifier.
-        let mut loan_id: vector<u8> = vector::empty<u8>();
-        vector::append(&mut loan_id, to_bytes<address>(&sender));
-        vector::append(&mut loan_id, to_bytes<address>(&receiver));
-        vector::append(&mut loan_id, to_bytes<u32>(&state.wormhole_nonce));
-        vector::append(&mut loan_id, to_bytes<u64>(&timestamp));
+        let loan_id: UID = object::new(ctx);
 
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_BORROW_METHOD);
-        vector::append(&mut payload, loan_id);
+        vector::append(&mut payload, object::uid_to_bytes(&loan_id));
         vector::append(&mut payload, to_bytes<address>(&sender));
         vector::append(&mut payload, to_bytes<address>(&receiver));
         vector::append(&mut payload, to_bytes<u16>(&to_chain_id));
@@ -305,8 +300,7 @@ module orbital::orbital {
         // Save loan object to sender.
         transfer::share_object(
             Loan<X> {
-                id: object::new(ctx),
-                loan_id: loan_id,
+                id: loan_id,
                 sender: sender,
                 coin_in_value: coin_in_value,
                 state: LoanStateACTIVE,
@@ -365,10 +359,11 @@ module orbital::orbital {
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_REPAY_METHOD);
-        vector::append(&mut payload, loan.loan_id);
+        vector::append(&mut payload, loan.foreign_loan_id);
         vector::append(&mut payload, to_bytes<u16>(&loan.to_chain_id));
         vector::append(&mut payload, to_bytes<address>(&from_contract_id));
         vector::append(&mut payload, to_bytes<address>(&to_contract_id));
+        vector::append(&mut payload, to_bytes<String>(&coin_out_id));
 
         // Get wormhole messgase fee.
         let wormhole_fee_value: u64 = message_fee(wormhole_state);
@@ -406,6 +401,7 @@ module orbital::orbital {
         coin_gas: Coin<SUI>, // Message fee.
         wormhole_state: &mut WormholeState,
         the_clock: &Clock,
+        receiver: address,
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
@@ -413,7 +409,7 @@ module orbital::orbital {
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_AMPLIFY_METHOD);
-        vector::append(&mut payload, to_bytes<address>(&sender));
+        vector::append(&mut payload, to_bytes<address>(&receiver));
         vector::append(&mut payload, to_bytes<bool>(&status));
 
         // Get wormhole messgase fee.
@@ -527,7 +523,7 @@ module orbital::orbital {
 
     fun on_borrow<Y>(
         state: &mut State,
-        loan_id: vector<u8>,
+        foreign_loan_id: vector<u8>,
         from_chain_id: u16,
         the_clock: &Clock,
         coin_out_value: u64,
@@ -549,7 +545,7 @@ module orbital::orbital {
         transfer::share_object(
             ForeignLoan<Y> {
                 id: object::new(ctx),
-                loan_id: loan_id,
+                foreign_loan_id: foreign_loan_id,
                 receiver: receiver,
                 coin_out_value: coin_out_value,
                 state: LoanStateACTIVE,

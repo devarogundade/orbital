@@ -19,12 +19,20 @@ export const tokens = [
     {
         name: 'Bitcoin',
         image: '/images/btc.png',
-        symbol: 'BTC'
+        symbol: 'BTC',
+        addresses: {
+            6: '',
+            21: ''
+        }
     },
     {
         name: 'Tether USD',
         image: '/images/usdt.png',
-        symbol: 'USDT'
+        symbol: 'USDT',
+        addresses: {
+            6: '',
+            21: ''
+        }
     }
 ];
 

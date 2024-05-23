@@ -1,25 +1,6 @@
 import * as dotenv from "dotenv";
 import Web3 from 'web3';
 
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
-
-// import ethOrbitalAbi from "./abis/ethereum/orbital.json";
-
-import http from 'http';
-
-dotenv.config();
-
-// Signing private keys.
-
-// const suiKeyPair = Ed25519Keypair.fromSecretKey(
-//     new Uint8Array(
-//         process.env.SUI_PRIVATE_KEY!!.trim.toString().split(",").map(Number)
-//     )
-// );
-
-// const handlerEvmKey = process.env.EVM_PRIVATE_KEY!!;
-
 import {
     Environment,
     StandardRelayerApp,
@@ -27,10 +8,23 @@ import {
 } from "@wormhole-foundation/relayer-engine";
 import { CHAIN_ID_SUI, CHAIN_ID_AVAX, hexToUint8Array } from "@certusone/wormhole-sdk";
 
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
+
+// Ethereum contract abi //
+import ethOrbitalAbi from "./abis/ethereum/orbital.json";
+
+import http from 'http';
+
+dotenv.config();
+
+// Orbital contract addresses //
+
 const ORBITAL_SUI = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd";
 const ORBITAL_AVAX = "0xdBFc47ccd46BfACa4141c9372028fF09008DAd11";
 
-/// @notice cross chain method identifier.
+// Cross chain method identifiers //
 const ON_BORROW_METHOD =
     "0x4f4e5f424f52524f575f4d4554484f4400000000000000000000000000000000";
 
@@ -64,46 +58,117 @@ const ON_AMPLIFY_METHOD =
         },
         async (ctx) => {
             const vaa = ctx.vaa;
-            const hash = ctx.sourceTxHash;
 
-            if (!vaa?.payload) return;
-
-            if (vaa?.emitterChain == CHAIN_ID_SUI) {
-                console.log('⚡Got VAA: ', vaa?.payload.toString('hex'));
+            // Check if VAA has a payload.
+            if (!vaa?.payload) {
+                console.log('Not payload was sent: ', vaa);
+                return;
             }
-            // Emitted for base chain
-            else if (vaa?.emitterChain == CHAIN_ID_AVAX) {
-                const web3 = new Web3();
 
-                const hexPayload = '0x' + vaa?.payload.toString('hex');
+            const web3 = new Web3();
+            console.log('⚡Got VAA: ', vaa?.payload.toString('hex'));
 
+            // Parse payload to HEX format.
+            const hexPayload = '0x' + vaa?.payload.toString('hex');
+
+            // Check for emitter chain.
+            if (vaa?.emitterChain == CHAIN_ID_SUI) {
+                // @dev Get the VAA method.
+                if (hexPayload.startsWith(ON_BORROW_METHOD)) {
+                    const params = web3.eth.abi.decodeParameters(
+                        ['bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'string', 'uint64'],
+                        hexPayload
+                    );
+
+                    const tx = await signOnBorrowTransactionOnEth(
+                        vaa.nonce,
+                        params[1],
+                        params[3],
+                        CHAIN_ID_SUI,
+                        params[5],
+                        getCoinType(params[7]),
+                        params[8]
+                    );
+
+                    console.log('⚡Trx hash: ', tx);
+
+                    return;
+                }
+
+                // @dev Get the VAA method.
+                if (hexPayload.startsWith(ON_REPAY_METHOD)) {
+                    const params = web3.eth.abi.decodeParameters(
+                        ['bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'string'],
+                        hexPayload
+                    );
+
+                    const tx = await signOnRepayTransactionOnEth(
+                        vaa.nonce,
+                        params[1]
+                    );
+
+                    console.log('⚡Trx hash: ', tx);
+
+                    return;
+                }
+
+                // @dev Get the VAA method.
+                if (hexPayload.startsWith(ON_AMPLIFY_METHOD)) {
+                    const params = web3.eth.abi.decodeParameters(
+                        ['bytes32', 'bytes32', 'bool'],
+                        hexPayload
+                    );
+
+                    const tx = await signOnAmplifyTransactionOnEth(
+                        vaa.nonce,
+                        params[1],
+                        params[2]
+                    );
+
+                    console.log('⚡Trx hash: ', tx);
+
+                    return;
+                }
+            } else if (vaa?.emitterChain == CHAIN_ID_AVAX) {
+                // @dev Get the VAA method.
                 if (hexPayload.startsWith(ON_BORROW_METHOD)) {
                     const params = web3.eth.abi.decodeParameters(
                         ['bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'bytes32', 'uint256'],
                         hexPayload
                     );
 
-                    // signOnBorrowTransactionOnSui(
-                    //     vaa.nonce,
-                    //     params[3],
-                    //     params[1],
-                    //     CHAIN_ID_AVAX,
-                    //     params[8],
-                    //     getCoinType(params[7])
-                    // );
+                    const tx = signOnBorrowTransactionOnSui(
+                        vaa.nonce,
+                        params[3], // receiver
+                        params[1], // loanId
+                        CHAIN_ID_AVAX,
+                        params[8], // loan value
+                        getCoinType(params[7]) // tokenOut
+                    );
+
+                    console.log('⚡Trx hash: ', tx);
+
+                    return;
                 }
 
+                // @dev Get the VAA method.
                 if (hexPayload.startsWith(ON_REPAY_METHOD)) {
+                    const params = web3.eth.abi.decodeParameters(
+                        ['bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32'],
+                        hexPayload
+                    );
 
+                    const tx = signOnRepayTransactionOnSui(
+                        vaa.nonce,
+                        params[1],
+                        getDefaultCoinInType(21)
+                    );
+
+                    console.log('⚡Trx hash: ', tx);
+
+                    return;
                 }
-
-                if (hexPayload.startsWith(ON_AMPLIFY_METHOD)) {
-
-                }
-
-            }
-            // Otherwise ~ error
-            else {
+            } else {
                 console.error('Undefined emiitter id');
             }
         },
@@ -137,7 +202,7 @@ const ON_AMPLIFY_METHOD =
 
         if (['GET', 'POST'].indexOf(request.method!!) > -1) {
             response.writeHead(200, headers);
-            response.end(JSON.stringify({ 'status': 'good' }), 'utf-8');
+            response.end(JSON.stringify({ 'status': true }), 'utf-8');
             return;
         }
 
@@ -148,107 +213,262 @@ const ON_AMPLIFY_METHOD =
     console.log(`[server]: Server running at http://${hostname}:${port}`);
 })();
 
-const ownerCap: string = "0x202796a6237ab8e4a6bb7fdd77cd7477fad08f1965085b790296eded2d1443fb";
-const state: string = "0xa340666496beed25da5cc167507f211f92cfedc8fd182dea645984f26c9eeb1e";
+// SUI DEPS //
+
+const state: string = "";
+const ownerCap: string = "";
 const theClock: string = "";
-const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
-const oracleHolder: string = "0x7ab6aa7c4f8ec79c630dc560ae34bd745a035c5a9ab9143b90b504399a4f1040";
-const priceFeedsState: string = "0x355075b86c56bb4ca1144365a9abb044a5acca48e6439bdf0a83c66252e0035a";
 
-// async function signOnBorrowTransactionOnSui(
-//     nonce: number,
-//     receiver: string,
-//     loanId: string,
-//     fromChainId: number,
-//     coinOutValue: number,
-//     coinOutType: string
-// ): Promise<string | null> {
-//     const rpcUrl = getFullnodeUrl('testnet');
+// SUI TRANSACTIONS //
 
-//     // create a client connected to devnet
-//     const client = new SuiClient({ url: rpcUrl });
+async function signOnBorrowTransactionOnSui(
+    nonce: number,
+    receiver: string,
+    loanId: string,
+    fromChainId: number,
+    coinOutValue: number,
+    coinOutType: string
+): Promise<string | null> {
+    const rpcUrl = getFullnodeUrl('testnet');
 
-//     try {
-//         const txb = new TransactionBlock();
+    const client = new SuiClient({ url: rpcUrl });
 
-//         txb.moveCall({
-//             target: `${ORBITAL_SUI}::orbital::receive_on_borrow`,
-//             // object IDs must be wrapped in moveCall arguments
-//             arguments: [
-//                 txb.object(ownerCap),
-//                 txb.object(state),
-//                 txb.pure(nonce),
-//                 txb.pure(hexToUint8Array(ON_BORROW_METHOD)),
-//                 txb.pure(hexToUint8Array(loanId)),
-//                 txb.pure(fromChainId),
-//                 txb.pure(receiver),
-//                 txb.pure(coinOutValue),
-//                 txb.object(theClock)
-//             ],
-//             typeArguments: [
-//                 coinOutType
-//             ]
-//         });
+    try {
+        const txb = new TransactionBlock();
 
-//         const result = await client.signAndExecuteTransactionBlock(
-//             { signer: suiKeyPair, transactionBlock: txb }
-//         );
+        txb.moveCall({
+            target: `${ORBITAL_SUI}::orbital::receive_on_borrow`,
+            arguments: [
+                txb.object(ownerCap),
+                txb.object(state),
+                txb.pure(nonce),
+                txb.pure(hexToUint8Array(ON_BORROW_METHOD)),
+                txb.pure(hexToUint8Array(loanId)),
+                txb.pure(fromChainId),
+                txb.pure(receiver),
+                txb.pure(coinOutValue),
+                txb.object(theClock)
+            ],
+            typeArguments: [coinOutType]
+        });
 
-//         const transactionBlock = await client.waitForTransactionBlock({
-//             digest: result.digest,
-//             options: {
-//                 showEffects: true,
-//             },
-//         });
+        // create signer object from private key.
+        const suiSigner = Ed25519Keypair.fromSecretKey(
+            hexToUint8Array(process.env.SUI_PRIVATE_KEY!!)
+        );
 
-//         return transactionBlock.digest;
-//     } catch (error) {
-//         console.error('Transaction: ', error);
+        const result = await client.signAndExecuteTransactionBlock(
+            { signer: suiSigner, transactionBlock: txb }
+        );
 
-//         return null;
-//     }
-// }
+        return result.digest;
+    } catch (error) {
+        console.error('Transaction: ', error);
 
-// async function signTransactionOnEth(nonce: number, payload: string) {
-//     const web3 = new Web3('https://polygon-mumbai.gateway.tenderly.co');
+        return null;
+    }
+}
 
-//     const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_POLYGON);
+async function signOnRepayTransactionOnSui(
+    nonce: number,
+    loan: string,
+    coinInType: string
+): Promise<string | null> {
+    const rpcUrl = getFullnodeUrl('testnet');
 
-//     // create signer object from private key.
-//     const signer = web3.eth.accounts.privateKeyToAccount(handlerEvmKey);
+    const client = new SuiClient({ url: rpcUrl });
 
-//     // add signer to web3.
-//     web3.eth.accounts.wallet.add(signer);
+    try {
+        const txb = new TransactionBlock();
 
-//     const method: string = extractEthMethod(payload);
-//     const methodArguments: string = extractArguments(nonce, payload);
+        txb.moveCall({
+            target: `${ORBITAL_SUI}::orbital::receive_on_borrow`,
+            arguments: [
+                txb.object(ownerCap),
+                txb.object(state),
+                txb.pure(nonce),
+                txb.pure(hexToUint8Array(ON_REPAY_METHOD)),
+                txb.object(loan)
+            ],
+            typeArguments: [coinInType]
+        });
 
-//     try {
-//         // estimate base eth gas fee.
-//         const gas = await orbital.methods.receiveMessage(
-//             nonce, method, methodArguments
-//         ).estimateGas({ from: signer.address });
+        // create signer object from private key.
+        const suiSigner = Ed25519Keypair.fromSecretKey(
+            hexToUint8Array(process.env.SUI_PRIVATE_KEY!!)
+        );
 
-//         // get base eth gas price.
-//         const gasPrice = await web3.eth.getGasPrice();
+        const result = await client.signAndExecuteTransactionBlock(
+            { signer: suiSigner, transactionBlock: txb }
+        );
 
-//         // call the transaction.
-//         const { transactionHash } = await orbital.methods.receiveMessage(
-//             nonce, method, methodArguments
-//         ).send({
-//             from: signer.address,
-//             gasPrice: gasPrice.toString(),
-//             gas: gas.toString()
-//         });
+        return result.digest;
+    } catch (error) {
+        console.error('Transaction: ', error);
 
-//         return transactionHash;
-//     } catch (error) {
-//         console.error('Transaction: ', error);
-//         return null;
-//     }
-// }
+        return null;
+    }
+}
 
-// Extraction methods
+// ETHEREUM TRANSACTIONS //
+
+async function signOnBorrowTransactionOnEth(
+    nonce: number,
+    loanId: string,
+    receiver: string,
+    fromChainId: number,
+    fromContractId: string,
+    tokenOut: string,
+    value: string
+) {
+    const web3 = new Web3('https://avalanche-fuji-c-chain-rpc.publicnode.com');
+
+    const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_AVAX);
+
+    // create signer object from private key.
+    const ethSigner = web3.eth.accounts.privateKeyToAccount(
+        process.env.EVM_PRIVATE_KEY!!
+    );
+
+    // add signer to web3.
+    web3.eth.accounts.wallet.add(ethSigner);
+
+    try {
+        // estimate base eth gas fee.
+        const gas = await orbital.methods.receiveOnBorrow(
+            nonce,
+            ON_BORROW_METHOD,
+            loanId,
+            receiver,
+            fromChainId,
+            fromContractId,
+            tokenOut,
+            value
+        ).estimateGas({ from: ethSigner.address });
+
+        // get base eth gas price.
+        const gasPrice = await web3.eth.getGasPrice();
+
+        // call the transaction.
+        const { transactionHash } = await orbital.methods.receiveOnBorrow(
+            nonce,
+            ON_BORROW_METHOD,
+            loanId,
+            receiver,
+            fromChainId,
+            fromContractId,
+            tokenOut,
+            value
+        ).send({
+            from: ethSigner.address,
+            gasPrice: gasPrice.toString(),
+            gas: gas.toString()
+        });
+
+        return transactionHash;
+    } catch (error) {
+        console.error('Transaction: ', error);
+
+        return null;
+    }
+}
+
+async function signOnRepayTransactionOnEth(
+    nonce: number,
+    loanId: string
+) {
+    const web3 = new Web3('https://avalanche-fuji-c-chain-rpc.publicnode.com');
+
+    const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_AVAX);
+
+    // create signer object from private key.
+    const ethSigner = web3.eth.accounts.privateKeyToAccount(
+        process.env.EVM_PRIVATE_KEY!!
+    );
+
+    // add signer to web3.
+    web3.eth.accounts.wallet.add(ethSigner);
+
+    try {
+        // estimate base eth gas fee.
+        const gas = await orbital.methods.receiveOnRepay(
+            nonce,
+            ON_REPAY_METHOD,
+            loanId
+        ).estimateGas({ from: ethSigner.address });
+
+        // get base eth gas price.
+        const gasPrice = await web3.eth.getGasPrice();
+
+        // call the transaction.
+        const { transactionHash } = await orbital.methods.receiveOnRepay(
+            nonce,
+            ON_REPAY_METHOD,
+            loanId
+        ).send({
+            from: ethSigner.address,
+            gasPrice: gasPrice.toString(),
+            gas: gas.toString()
+        });
+
+        return transactionHash;
+    } catch (error) {
+        console.error('Transaction: ', error);
+
+        return null;
+    }
+}
+
+async function signOnAmplifyTransactionOnEth(
+    nonce: number,
+    receiver: string,
+    status: boolean
+): Promise<string | null> {
+    const web3 = new Web3('https://avalanche-fuji-c-chain-rpc.publicnode.com');
+
+    const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_AVAX);
+
+    // create signer object from private key.
+    const ethSigner = web3.eth.accounts.privateKeyToAccount(
+        process.env.EVM_PRIVATE_KEY!!
+    );
+
+    // add signer to web3.
+    web3.eth.accounts.wallet.add(ethSigner);
+
+    try {
+        // estimate base eth gas fee.
+        const gas = await orbital.methods.receiveOnRepay(
+            nonce,
+            ON_AMPLIFY_METHOD,
+            receiver,
+            status
+        ).estimateGas({ from: ethSigner.address });
+
+        // get base eth gas price.
+        const gasPrice = await web3.eth.getGasPrice();
+
+        // call the transaction.
+        const { transactionHash } = await orbital.methods.receiveOnRepay(
+            nonce,
+            ON_AMPLIFY_METHOD,
+            receiver,
+            status
+        ).send({
+            from: ethSigner.address,
+            gasPrice: gasPrice.toString(),
+            gas: gas.toString()
+        });
+
+        return transactionHash;
+    } catch (error) {
+        console.error('Transaction: ', error);
+
+        return null;
+    }
+}
+
+// Extraction methods //
 
 function getCoinType(tokenId: string): string {
     // BTC
@@ -267,6 +487,14 @@ function getCoinType(tokenId: string): string {
 
     if (tokenId == '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC') {
         return "0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517";
+    }
+
+    return "";
+}
+
+function getDefaultCoinInType(chainId: number): string {
+    if (chainId == 21) {
+        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT";
     }
 
     return "";
