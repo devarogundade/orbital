@@ -6,7 +6,7 @@ import {
     StandardRelayerApp,
     StandardRelayerContext,
 } from "@wormhole-foundation/relayer-engine";
-import { CHAIN_ID_SUI, CHAIN_ID_AVAX, hexToUint8Array } from "@certusone/wormhole-sdk";
+import { CHAIN_ID_SUI, CHAIN_ID_AVAX } from "@certusone/wormhole-sdk";
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
@@ -21,8 +21,8 @@ dotenv.config();
 
 // Orbital contract addresses //
 
-const ORBITAL_SUI = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd";
-const ORBITAL_AVAX = "0xdBFc47ccd46BfACa4141c9372028fF09008DAd11";
+const ORBITAL_SUI = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd";
+const ORBITAL_AVAX = "0xdD7276F4e1983006033d583426e0D7947A7c14c8";
 
 // Cross chain method identifiers //
 const ON_BORROW_METHOD =
@@ -86,7 +86,7 @@ const ON_AMPLIFY_METHOD =
                         params[3],
                         CHAIN_ID_SUI,
                         params[5],
-                        getCoinType(params[7]),
+                        getDefaultEthCoinInType(),
                         params[8]
                     );
 
@@ -143,7 +143,7 @@ const ON_AMPLIFY_METHOD =
                         params[1], // loanId
                         CHAIN_ID_AVAX,
                         params[8], // loan value
-                        getCoinType(params[7]) // tokenOut
+                        getDefaultSUICoinOutType() // tokenOut
                     );
 
                     console.log('⚡Trx hash: ', tx);
@@ -161,7 +161,7 @@ const ON_AMPLIFY_METHOD =
                     const tx = signOnRepayTransactionOnSui(
                         vaa.nonce,
                         params[1],
-                        getDefaultCoinInType(21)
+                        getDefaultSUICoinInType()
                     );
 
                     console.log('⚡Trx hash: ', tx);
@@ -215,9 +215,9 @@ const ON_AMPLIFY_METHOD =
 
 // SUI DEPS //
 
-const state: string = "";
-const ownerCap: string = "";
-const theClock: string = "";
+const state: string = "0x6ceebbd7158f29a62b0dbb2f277d24089f01bb7aa12824ea28cf6664854624a7";
+const ownerCap: string = "0x12798cc5de91508e71986012fa85fc1357d7ef784d0ce38d3df0d2dd4636f69a";
+const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 // SUI TRANSACTIONS //
 
@@ -229,6 +229,9 @@ async function signOnBorrowTransactionOnSui(
     coinOutValue: number,
     coinOutType: string
 ): Promise<string | null> {
+    console.log(nonce, receiver, loanId, fromChainId, coinOutValue, coinOutType);
+
+
     const rpcUrl = getFullnodeUrl('testnet');
 
     const client = new SuiClient({ url: rpcUrl });
@@ -242,8 +245,8 @@ async function signOnBorrowTransactionOnSui(
                 txb.object(ownerCap),
                 txb.object(state),
                 txb.pure(nonce),
-                txb.pure(hexToUint8Array(ON_BORROW_METHOD)),
-                txb.pure(hexToUint8Array(loanId)),
+                txb.pure(ON_BORROW_METHOD),
+                txb.pure(loanId),
                 txb.pure(fromChainId),
                 txb.pure(receiver),
                 txb.pure(coinOutValue),
@@ -253,12 +256,12 @@ async function signOnBorrowTransactionOnSui(
         });
 
         // create signer object from private key.
-        const suiSigner = Ed25519Keypair.fromSecretKey(
-            hexToUint8Array(process.env.SUI_PRIVATE_KEY!!)
+        const keypair = Ed25519Keypair.deriveKeypair(
+            process.env.SUI_PRIVATE_KEY!!
         );
 
         const result = await client.signAndExecuteTransactionBlock(
-            { signer: suiSigner, transactionBlock: txb }
+            { signer: keypair, transactionBlock: txb }
         );
 
         return result.digest;
@@ -287,19 +290,19 @@ async function signOnRepayTransactionOnSui(
                 txb.object(ownerCap),
                 txb.object(state),
                 txb.pure(nonce),
-                txb.pure(hexToUint8Array(ON_REPAY_METHOD)),
+                txb.pure(ON_REPAY_METHOD),
                 txb.object(loan)
             ],
             typeArguments: [coinInType]
         });
 
         // create signer object from private key.
-        const suiSigner = Ed25519Keypair.fromSecretKey(
-            hexToUint8Array(process.env.SUI_PRIVATE_KEY!!)
+        const keypair = Ed25519Keypair.deriveKeypair(
+            process.env.SUI_PRIVATE_KEY!!
         );
 
         const result = await client.signAndExecuteTransactionBlock(
-            { signer: suiSigner, transactionBlock: txb }
+            { signer: keypair, transactionBlock: txb }
         );
 
         return result.digest;
@@ -470,32 +473,16 @@ async function signOnAmplifyTransactionOnEth(
 
 // Extraction methods //
 
-function getCoinType(tokenId: string): string {
-    // BTC
-    if (tokenId == '0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517') {
-        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT";
-    }
+const faucet = "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33";
 
-    if (tokenId == '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT') {
-        return "0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517";
-    }
-
-    // USDT
-    if (tokenId == '0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517') {
-        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC";
-    }
-
-    if (tokenId == '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC') {
-        return "0x000000000000000000000000e61c27b23970d90bb6a0425498d41cc990b8f517";
-    }
-
-    return "";
+function getDefaultSUICoinInType(): string {
+    return `${faucet}::usdt::USDT`;
 }
 
-function getDefaultCoinInType(chainId: number): string {
-    if (chainId == 21) {
-        return "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT";
-    }
+function getDefaultSUICoinOutType(): string {
+    return `${faucet}::btc::BTC`;
+}
 
-    return "";
+function getDefaultEthCoinInType(): string {
+    return "0x000000000000000000000000FD132250838394168dFC2Da524C5Ee612715c431";
 }

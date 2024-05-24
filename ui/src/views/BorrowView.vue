@@ -1,15 +1,112 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { chain, token } from '@/scripts/chains';
-import { defaultInterestRate, ethBorrow, ethRepay, suiBorrow, suiRepay } from '@/scripts/loan';
+import { addressToBytes32, defaultInterestRate, ethBorrow, ethRepay, getAmountOut, ORBITAL_AVAX, suiBorrow, suiRepay } from '@/scripts/loan';
 import Converter from '@/scripts/converter';
 // @ts-ignore
 import { useStore } from 'vuex';
 import { key } from '../store';
 import type { Loan } from '@/types';
 import { getAllLoans, saveNewLoan } from '@/scripts/storage';
+import { approve, getAllowance } from '@/scripts/erc20';
+import { notify } from '@/reactives/notify';
+
+const emit = defineEmits(['close']);
 
 const store = useStore(key);
+
+const allowance = ref<String>('0');
+const approving = ref<boolean>(false);
+const borrowing = ref<boolean>(false);
+const repaying = ref<number | null>(null);
+
+const loan = ref<Loan>({
+  amountIn: undefined,
+  amountOut: undefined,
+  tokenType: 0,
+  fromChainId: 6,
+  toChainId: 21,
+  collateral: 'USDT',
+  principal: 'BTC',
+  interchange: false,
+  interestRate: undefined, // will be injected later
+  startSecs: undefined // will be injected later
+});
+
+const myLoans = ref<Loan[]>([]);
+
+watch(
+  loan,
+  () => {
+    updateAllowance();
+    updateAmountOut();
+  },
+  { deep: true, }
+);
+
+const updateAllowance = async () => {
+  if (loan.value.fromChainId == 21) {
+    allowance.value = "1000000000000000000000000000";
+    return;
+  }
+
+  if (store.state.ethAddress) {
+    try {
+      allowance.value = Converter.fromWei(
+        await getAllowance(
+          token(loan.value.collateral)!.addresses[6] as `0x${string}`,
+          store.state.ethAddress,
+          ORBITAL_AVAX
+        )
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  }
+};
+
+const updateAmountOut = async () => {
+  const amountOut = await getAmountOut(
+    addressToBytes32(token(loan.value.collateral)!.addresses[6]),
+    addressToBytes32(token(loan.value.principal)!.addresses[6]),
+    Converter.toWei(loan.value.amountIn?.toString() || "0"),
+  );
+
+  loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(8));
+};
+
+const approveOrbital = async () => {
+  if (approving.value || !loan.value.amountIn) return;
+  approving.value = true;
+
+  const hash = await approve(
+    token(loan.value.collateral)!.addresses[6] as `0x${string}`,
+    ORBITAL_AVAX,
+    Converter.toWei(loan.value.amountIn!.toString())
+  );
+
+  if (hash) {
+    notify.push({
+      title: 'Transaction successful.',
+      description: 'Transaction was sent.',
+      category: 'success',
+      linkTitle: 'View Trx',
+      linkUrl: `https://testnet.snowtrace.io/tx/${hash}`
+    });
+
+    emit('close');
+  } else {
+    notify.push({
+      title: 'Failed to send transaction.',
+      description: 'Try again.',
+      category: 'error'
+    });
+  }
+
+  approving.value = false;
+
+  updateAllowance();
+};
 
 const calculateInterest = (
   value: number,
@@ -31,24 +128,6 @@ const interchange = () => {
   toTemp = null;
 };
 
-const borrowing = ref<boolean>(false);
-const repaying = ref<number | null>(null);
-
-const loan = ref<Loan>({
-  amountIn: undefined,
-  amountOut: undefined,
-  tokenType: 0,
-  fromChainId: 6,
-  toChainId: 21,
-  collateral: 'USDT',
-  principal: 'BTC',
-  interchange: false,
-  interestRate: undefined, // will be injected later
-  startSecs: undefined // will be injected later
-});
-
-const myLoans = ref<Loan[]>([]);
-
 const borrow = async () => {
   if (!store.state.ethAddress || !store.state.suiAddress) {
 
@@ -68,22 +147,37 @@ const borrow = async () => {
   if (loan.value.fromChainId == 6) {
     borrowing.value = true;
 
-    const tx = await ethBorrow(
+    const hash = await ethBorrow(
       loan.value.toChainId,
-      token(loan.value.collateral)!.addresses[6],
-      token(loan.value.principal)!.addresses[6],
+      addressToBytes32(token(loan.value.collateral)!.addresses[6]),
+      addressToBytes32(token(loan.value.principal)!.addresses[6]),
       Converter.toWei(loan.value.amountIn.toString()),
-      store.state.suiAddress
+      addressToBytes32(store.state.suiAddress)
     );
 
-    if (tx) {
+    if (hash) {
+      notify.push({
+        title: 'Transaction successful.',
+        description: 'Transaction was sent.',
+        category: 'success',
+        linkTitle: 'View Trx',
+        linkUrl: `https://testnet.snowtrace.io/tx/${hash}`
+      });
 
       loan.value.interestRate = defaultInterestRate;
       loan.value.startSecs = Number(Number(Date.now() / 1000).toFixed(0));
 
+      // save a new loan.
       saveNewLoan(loan.value);
-    } else {
 
+      // update all loans.
+      myLoans.value = getAllLoans();
+    } else {
+      notify.push({
+        title: 'Failed to send transaction.',
+        description: 'Try again.',
+        category: 'error'
+      });
     }
 
     borrowing.value = false;
@@ -197,7 +291,7 @@ onMounted(() => {
               <div class="input_token">
                 <p>Enter amount:</p>
                 <div class="input">
-                  <input v-model="loan.amountIn" type="number" placeholder="0.00" />
+                  <input min="0" v-model="loan.amountIn" type="number" placeholder="0.00" />
                   <div class="token">
                     <img :src="token(loan.collateral)!.image" alt="">
                     <p>{{ token(loan.collateral)!.symbol }}</p>
@@ -252,7 +346,15 @@ onMounted(() => {
             </div>
 
             <div class="action">
-              <button @click="borrow">Borrow</button>
+              <button v-if="Number(allowance) < (loan.amountIn || 0)" @click="approveOrbital">
+                {{ approving.valueOf() ? 'Approving..' : 'Approve' }}
+              </button>
+              <button @click="Number(allowance) >= (loan.amountIn || 0) ? borrow() : null" :style="{
+                opacity: `${Number(allowance) >= (loan.amountIn || 0) ? '1' : '0.5'}`,
+                cursor: `${Number(allowance) >= (loan.amountIn || 0) ? 'pointer' : 'not-allowed'}`
+              }">
+                {{ borrowing.valueOf() ? 'Borrowing..' : 'Borrow' }}
+              </button>
             </div>
           </div>
         </div>
@@ -277,7 +379,7 @@ onMounted(() => {
                       <div class="token">
                         <img :src="token(loan.collateral)!.image" alt="">
                         <p>
-                          {{ Converter.toMoney(Converter.fromWei(loan.amountIn!.toString())) }}
+                          {{ Converter.toMoney(loan.amountIn!.toString()) }}
                           {{ token(loan.collateral)!.symbol }}
                         </p>
                       </div>
@@ -293,7 +395,7 @@ onMounted(() => {
                         <img :src="token(loan.principal)!.image" alt="">
                         <p>
                           <!-- calculate interest instead -->
-                          {{ Converter.toMoney(Converter.fromWei(loan.amountIn!.toString())) }}
+                          {{ Converter.toMoney(loan.amountOut!.toString()) }}
                           {{ token(loan.principal)!.symbol }}
                         </p>
                       </div>
@@ -539,6 +641,9 @@ input {
 .action {
   width: 100%;
   padding: 10px 24px 24px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .action button {

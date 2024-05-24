@@ -174,7 +174,7 @@ contract Orbital is IOrbital, Ownable2Step {
         return loanId;
     }
 
-    function repay(bytes32 loanId) external payable returns (bool) {
+    function repay(bytes32 loanId) external payable override returns (bool) {
         address sender = _msgSender();
 
         /// @notice Look up for foreign loan.
@@ -381,6 +381,28 @@ contract Orbital is IOrbital, Ownable2Step {
         loan.state = LoanState.SETTLED;
 
         return true;
+    }
+
+    ////////////////////////////////
+    ////     READ FUNCTIONS     ////
+    ////////////////////////////////
+
+    function getAmountOut(
+        bytes32 tokenIn,
+        bytes32 tokenOut,
+        uint256 amountIn,
+        uint8 ltv
+    ) external view override returns (uint256) {
+        /// @notice Get input amount equivalent of output amount.
+        uint256 amountOut = _priceFeeds.estimateFromTo(
+            tokenIn,
+            tokenOut,
+            amountIn
+        );
+
+        (uint256 loan, ) = _splitAmount(amountOut, ltv);
+
+        return loan;
     }
 
     ////////////////////////////////

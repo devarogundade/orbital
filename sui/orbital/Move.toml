@@ -3,7 +3,7 @@ name = "orbital"
 edition = "2024.beta"
 license = "UNLICENSED"
 authors = ["Ibrahim Arogundade (devarogundade@gmail.com)"]
-published-at = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd"
+# published-at = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
@@ -12,7 +12,7 @@ supra = { local = '../supra' }
 
 [addresses]
 sui = "0x2"
-orbital = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd"
+orbital = "0x0"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.

@@ -8,18 +8,18 @@ const PriceFeedsModule = buildModule("PriceFeedsModule", (m) => {
 
   const priceFeeds = m.contract("PriceFeeds", [sValueFeed], { from: account });
 
-  const update1 = m.call(priceFeeds, "updateFeedId", ["0x00000000000000000000000081297d0e83488A4eFC074041488bB4a9B5713a0E", 18], {
+  const update1 = m.call(priceFeeds, "updateFeedId", ["0x000000000000000000000000bDD5A6fD93267B9dc3943361f6cF162bC201F6F7", 18], {
     id: "BTC",
     from: account
   });
 
-  const update2 = m.call(priceFeeds, "updateFeedId", ["0x000000000000000000000000e61C27B23970D90Bb6A0425498D41cC990B8F517", 48], {
+  const update2 = m.call(priceFeeds, "updateFeedId", ["0x000000000000000000000000FD132250838394168dFC2Da524C5Ee612715c431", 48], {
     id: "USDT",
     from: account
   });
 
   m.call(priceFeeds, "getPrice", [
-    "0x00000000000000000000000081297d0e83488A4eFC074041488bB4a9B5713a0E"
+    "0x000000000000000000000000bDD5A6fD93267B9dc3943361f6cF162bC201F6F7"
   ], {
     after: [update1, update2],
     from: account

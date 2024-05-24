@@ -36,6 +36,8 @@ interface IOrbital {
         bytes32 receiver
     ) external payable returns (bytes32);
 
+    function repay(bytes32 loanId) external payable returns (bool);
+
     function receiveOnBorrow(
         uint32 wormholeNonce,
         bytes32 method,
@@ -59,4 +61,11 @@ interface IOrbital {
         bytes32 receiver,
         bool status
     ) external;
+
+    function getAmountOut(
+        bytes32 tokenIn,
+        bytes32 tokenOut,
+        uint256 amountIn,
+        uint8 ltv
+    ) external view returns (uint256);
 }

@@ -24,7 +24,7 @@ const Converter = {
             return '0';
         }
     },
-    toMoney: function (amount: any, max = null) {
+    toMoney: function (amount: any, noComma = false, max = null) {
         let maxF = max ? max : 6;
         if (amount > 1) {
             maxF = 3;
@@ -41,6 +41,9 @@ const Converter = {
             minimumFractionDigits: 0,
             maximumFractionDigits: maxF
         });
+        if (noComma) {
+            return formatter.format(amount).replace('$', '').replace(',', '');
+        }
         return formatter.format(amount).replace('$', '');
     },
     nFormatter: function (num: number, digits: number) {

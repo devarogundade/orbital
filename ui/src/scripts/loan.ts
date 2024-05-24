@@ -1,4 +1,4 @@
-import { waitForTransactionReceipt, writeContract } from '@wagmi/core';
+import { waitForTransactionReceipt, writeContract, readContract } from '@wagmi/core';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 
 import { abi as ethAbi } from '../contracts/eth';
@@ -6,8 +6,52 @@ import { config } from './config';
 
 export const defaultInterestRate = 10000000000;
 
-const ORBITAL_SUI: string = "";
-export const ORBITAL_AVAX: `0x${string}` = '0x';
+const ORBITAL_SUI = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd";
+export const ORBITAL_AVAX = '0xdD7276F4e1983006033d583426e0D7947A7c14c8';
+
+export function addressToBytes32(address: string): string {
+    // Remove the '0x' prefix if present
+    const strippedAddress = address.startsWith('0x') ? address.slice(2) : address;
+
+    // Pad the address with leading zeros to ensure it is 32 bytes long
+    const paddedAddress = strippedAddress.padStart(64, '0');
+
+    // Add the '0x' prefix back
+    return '0x' + paddedAddress;
+}
+
+export function bytes32ToAddress(bytes32: string): string {
+    // Check if the input is a valid bytes32 string
+    if (bytes32.length !== 66 || !bytes32.startsWith('0x')) {
+        throw new Error('Invalid bytes32 string');
+    }
+
+    // Extract the last 20 bytes (40 hexadecimal characters)
+    const address = '0x' + bytes32.slice(-40);
+
+    return address;
+}
+
+export async function getAmountOut(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string,
+    ltv: number = 80
+) {
+    try {
+        return readContract(config, {
+            abi: ethAbi,
+            address: ORBITAL_AVAX,
+            functionName: 'getAmountOut',
+            args: [tokenIn, tokenOut, amountIn, ltv]
+        }
+        );
+    } catch (error) {
+        console.log(error);
+
+        return 0;
+    }
+}
 
 export async function ethBorrow(
     toChainId: number,
@@ -59,11 +103,11 @@ export async function ethRepay(
 
 // SUI DEPS //
 
-const state: string = "";
-const wormholeState: string = "";
-const oracleHolder: string = "";
-const priceFeedsState: string = "";
-const theClock: string = "";
+const state: string = "0x6ceebbd7158f29a62b0dbb2f277d24089f01bb7aa12824ea28cf6664854624a7";
+const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
+const oracleHolder: string = "0x7ab6aa7c4f8ec79c630dc560ae34bd745a035c5a9ab9143b90b504399a4f1040";
+const priceFeedsState: string = "0xc51ecfe4b7499c3ffbaaf9ac2a5b4c197e657e8ce468c8919610eab01227e720";
+const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 export async function suiBorrow(
     toChainId: number,
@@ -80,7 +124,7 @@ export async function suiBorrow(
             txb.pure(0) // Wormhole fee.
         ]);
 
-        const [coinIn] = txb.splitCoins(txb.gas, [
+        const [coinIn] = txb.splitCoins(txb.object("0x656f9dd7bbf01bda7e0775018b4b88aa94128e63c0dc97ed113659c6d316fedb"), [
             txb.pure.u64(coinInValue)
         ]);
 

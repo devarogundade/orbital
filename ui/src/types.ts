@@ -10,3 +10,11 @@ export type Loan = {
     interestRate: number | undefined;
     startSecs: number | undefined;
 };
+
+export interface Message {
+    title: string;
+    description: string;
+    category: string;
+    linkTitle?: string;
+    linkUrl?: string;
+}
