@@ -1,4 +1,40 @@
 <script setup lang="ts">
+import { suiStakeFrens } from '@/scripts/loan';
+import { ref } from 'vue';
+// @ts-ignore
+import { useStore } from 'vuex';
+import { key } from '../store';
+import { notify } from '@/reactives/notify';
+import { addressToBytes32 } from '@/scripts/loan';
+
+const store = useStore(key);
+
+const staking = ref<boolean>(false);
+
+const stake = async () => {
+  staking.value = true;
+
+  const tx = await suiStakeFrens(
+    true,
+    addressToBytes32(store.state.ethAddress),
+    store.state.suiAdapter
+  );
+
+  if (tx) {
+
+
+  } else {
+    notify.push({
+      title: 'Failed to send transaction.',
+      description: 'Try again.',
+      category: 'error'
+    });
+  }
+
+  staking.value = false;
+
+  return;
+};
 </script>
 
 <template>
@@ -36,7 +72,7 @@
             </div>
 
             <div class="action">
-              <button>Stake</button>
+              <button @click="stake">{{ staking.valueOf() ? 'Staking..' : 'Stake' }}</button>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ export const chains = [
         name: 'Avalanche',
         image: '/images/avax.png',
         chainId: 6,
-        native: 'ETH',
+        native: 'AVAX',
         isEvm: true
     }
 ];

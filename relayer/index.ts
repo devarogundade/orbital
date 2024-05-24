@@ -8,6 +8,7 @@ import {
 } from "@wormhole-foundation/relayer-engine";
 import { CHAIN_ID_SUI, CHAIN_ID_AVAX } from "@certusone/wormhole-sdk";
 
+import { bcs } from '@mysten/bcs';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
@@ -22,6 +23,7 @@ dotenv.config();
 // Orbital contract addresses //
 
 const ORBITAL_SUI = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd";
+const ORBITAL_SUI_EMITTER = "0xb6888ee0f6d3f4c816c4e8c71771879b60c87fd839e291e7bd10ca27ba0ceb23";
 const ORBITAL_AVAX = "0xdD7276F4e1983006033d583426e0D7947A7c14c8";
 
 // Cross chain method identifiers //
@@ -53,7 +55,7 @@ const ON_AMPLIFY_METHOD =
     // invoked on finding a VAA that matches the filter
     app.multiple(
         {
-            [CHAIN_ID_SUI]: ORBITAL_SUI,
+            [CHAIN_ID_SUI]: ORBITAL_SUI_EMITTER,
             [CHAIN_ID_AVAX]: ORBITAL_AVAX
         },
         async (ctx) => {
@@ -66,10 +68,11 @@ const ON_AMPLIFY_METHOD =
             }
 
             const web3 = new Web3();
-            console.log('⚡Got VAA: ', vaa?.payload.toString('hex'));
 
             // Parse payload to HEX format.
             const hexPayload = '0x' + vaa?.payload.toString('hex');
+
+            console.log('[new vaa]: ', hexPayload);
 
             // Check for emitter chain.
             if (vaa?.emitterChain == CHAIN_ID_SUI) {
@@ -96,7 +99,7 @@ const ON_AMPLIFY_METHOD =
                 }
 
                 // @dev Get the VAA method.
-                if (hexPayload.startsWith(ON_REPAY_METHOD)) {
+                if (hexPayload.startsWith(removeTrailingZeros(ON_REPAY_METHOD))) {
                     const params = web3.eth.abi.decodeParameters(
                         ['bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'string'],
                         hexPayload
@@ -113,16 +116,13 @@ const ON_AMPLIFY_METHOD =
                 }
 
                 // @dev Get the VAA method.
-                if (hexPayload.startsWith(ON_AMPLIFY_METHOD)) {
-                    const params = web3.eth.abi.decodeParameters(
-                        ['bytes32', 'bytes32', 'bool'],
-                        hexPayload
-                    );
+                if (hexPayload.startsWith(removeTrailingZeros(ON_AMPLIFY_METHOD))) {
+                    const params = splitSuiAmplifierHex(hexPayload);
 
                     const tx = await signOnAmplifyTransactionOnEth(
                         vaa.nonce,
-                        params[1],
-                        params[2]
+                        params.receiver,
+                        params.status
                     );
 
                     console.log('⚡Trx hash: ', tx);
@@ -131,13 +131,13 @@ const ON_AMPLIFY_METHOD =
                 }
             } else if (vaa?.emitterChain == CHAIN_ID_AVAX) {
                 // @dev Get the VAA method.
-                if (hexPayload.startsWith(ON_BORROW_METHOD)) {
+                if (hexPayload.startsWith(removeTrailingZeros(ON_BORROW_METHOD))) {
                     const params = web3.eth.abi.decodeParameters(
                         ['bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'bytes32', 'uint256'],
                         hexPayload
                     );
 
-                    const tx = signOnBorrowTransactionOnSui(
+                    const tx = await signOnBorrowTransactionOnSui(
                         vaa.nonce,
                         params[3], // receiver
                         params[1], // loanId
@@ -152,13 +152,13 @@ const ON_AMPLIFY_METHOD =
                 }
 
                 // @dev Get the VAA method.
-                if (hexPayload.startsWith(ON_REPAY_METHOD)) {
+                if (hexPayload.startsWith(removeTrailingZeros(ON_REPAY_METHOD))) {
                     const params = web3.eth.abi.decodeParameters(
                         ['bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32'],
                         hexPayload
                     );
 
-                    const tx = signOnRepayTransactionOnSui(
+                    const tx = await signOnRepayTransactionOnSui(
                         vaa.nonce,
                         params[1],
                         getDefaultSUICoinInType()
@@ -229,9 +229,6 @@ async function signOnBorrowTransactionOnSui(
     coinOutValue: number,
     coinOutType: string
 ): Promise<string | null> {
-    console.log(nonce, receiver, loanId, fromChainId, coinOutValue, coinOutType);
-
-
     const rpcUrl = getFullnodeUrl('testnet');
 
     const client = new SuiClient({ url: rpcUrl });
@@ -244,27 +241,31 @@ async function signOnBorrowTransactionOnSui(
             arguments: [
                 txb.object(ownerCap),
                 txb.object(state),
-                txb.pure(nonce),
-                txb.pure(ON_BORROW_METHOD),
-                txb.pure(loanId),
-                txb.pure(fromChainId),
-                txb.pure(receiver),
-                txb.pure(coinOutValue),
+                txb.pure.u32(nonce),
+                txb.pure(bcs.vector(bcs.u8()).serialize(hexToUint8Array(ON_BORROW_METHOD))),
+                txb.pure(bcs.vector(bcs.u8()).serialize(hexToUint8Array(loanId))),
+                txb.pure.u16(fromChainId),
+                txb.pure.address(receiver),
+                txb.pure.u64(coinOutValue),
                 txb.object(theClock)
             ],
             typeArguments: [coinOutType]
         });
+
+        txb.setGasBudget(50_000_000);
 
         // create signer object from private key.
         const keypair = Ed25519Keypair.deriveKeypair(
             process.env.SUI_PRIVATE_KEY!!
         );
 
-        const result = await client.signAndExecuteTransactionBlock(
+        const { digest } = await client.signAndExecuteTransactionBlock(
             { signer: keypair, transactionBlock: txb }
         );
 
-        return result.digest;
+        await client.waitForTransactionBlock({ digest });
+
+        return digest;
     } catch (error) {
         console.error('Transaction: ', error);
 
@@ -441,7 +442,7 @@ async function signOnAmplifyTransactionOnEth(
 
     try {
         // estimate base eth gas fee.
-        const gas = await orbital.methods.receiveOnRepay(
+        const gas = await orbital.methods.receiveOnStakeSuiFrens(
             nonce,
             ON_AMPLIFY_METHOD,
             receiver,
@@ -452,7 +453,7 @@ async function signOnAmplifyTransactionOnEth(
         const gasPrice = await web3.eth.getGasPrice();
 
         // call the transaction.
-        const { transactionHash } = await orbital.methods.receiveOnRepay(
+        const { transactionHash } = await orbital.methods.receiveOnStakeSuiFrens(
             nonce,
             ON_AMPLIFY_METHOD,
             receiver,
@@ -485,4 +486,72 @@ function getDefaultSUICoinOutType(): string {
 
 function getDefaultEthCoinInType(): string {
     return "0x000000000000000000000000FD132250838394168dFC2Da524C5Ee612715c431";
+}
+
+function hexToUint8Array(hex: string): number[] {
+    // Ensure the hex string is valid
+    if (typeof hex !== 'string') {
+        throw new TypeError('Expected input to be a string');
+    }
+
+    // Remove any potential leading "0x"
+    if (hex.startsWith('0x')) {
+        hex = hex.slice(2);
+    }
+
+    // Check if the length of the string is even
+    if (hex.length % 2 !== 0) {
+        throw new Error('Hex string must have an even number of characters');
+    }
+
+    // Create a Uint8Array
+    const byteArray = new Uint8Array(hex.length / 2);
+
+    for (let i = 0; i < hex.length; i += 2) {
+        byteArray[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+
+    const numberArray: number[] = [];
+
+    for (let i = 0; i < byteArray.length; i++) {
+        if (byteArray[i] > 0) {
+            numberArray.push(byteArray[i]);
+        }
+    }
+
+    return numberArray;
+}
+
+function splitSuiAmplifierHex(hex: string): { method: string, receiver: string, status: boolean; } {
+    // Remove the '0x' prefix
+    const hexData = hex.slice(2);
+
+    // Extract bytes20 (first 20 bytes, 40 hex characters)
+    const method = '0x' + hexData.slice(0, 40);
+
+    // Extract address (next 20 bytes, 40 hex characters)
+    const receiver = '0x' + hexData.slice(40, 40 + 40);
+
+    // Extract boolean (last byte, 2 hex characters)
+    const booleanByte = hexData.slice(80, 82);
+    const status = booleanByte !== '00';
+
+
+    return { method, receiver, status };
+}
+
+function removeTrailingZeros(bytes32: string): string {
+    // Ensure the input starts with '0x' and is 66 characters long (including '0x')
+    if (!bytes32.startsWith('0x') || bytes32.length !== 66) {
+        throw new Error('Invalid bytes32 format or length');
+    }
+
+    // Remove the '0x' prefix
+    let hexData = bytes32.slice(2);
+
+    // Remove trailing zeros
+    hexData = hexData.replace(/0+$/, '');
+
+    // Add the '0x' prefix back
+    return '0x' + hexData;
 }

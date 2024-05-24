@@ -219,7 +219,7 @@ section {
 .lend_text h3 {
   font-size: 40px;
   font-weight: 500;
-  color: #10943c;
+  color: rgb(128, 175, 209);
 }
 
 .lend_text p {

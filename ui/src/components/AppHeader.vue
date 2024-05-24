@@ -23,7 +23,7 @@
                         <button class="connect">Launch App</button>
                     </RouterLink>
 
-                    <div v-else style="display: flex; gap: 16px;">
+                    <div v-else style="display: flex; gap: 16px; align-items: center;">
                         <button v-if="!store.state.suiAddress" class="connect" @click="sui.onClick()">
                             Connect to SUI
                         </button>
@@ -39,6 +39,9 @@
                         <button v-else class="connect">
                             {{ Converter.fineHash(store.state.ethAddress, 5) }}
                         </button>
+
+                        <RouterLink v-if="store.state.ethAddress && store.state.suiAddress" class="faucet" to="/faucet">
+                            ⛽</RouterLink>
                     </div>
                 </div>
             </header>
@@ -154,5 +157,9 @@ header {
     font-weight: 500;
     padding: 0 16px;
     color: var(--tx-normal);
+}
+
+.faucet {
+    font-size: 18px;
 }
 </style>

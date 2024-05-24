@@ -66,10 +66,15 @@ const updateAllowance = async () => {
 };
 
 const updateAmountOut = async () => {
+  if (!loan.value.amountIn) {
+    loan.value.amountOut = undefined;
+    return;
+  }
+
   const amountOut = await getAmountOut(
     addressToBytes32(token(loan.value.collateral)!.addresses[6]),
     addressToBytes32(token(loan.value.principal)!.addresses[6]),
-    Converter.toWei(loan.value.amountIn?.toString() || "0"),
+    Converter.toWei(loan.value.amountIn!.toString()),
   );
 
   loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(8));
@@ -114,7 +119,6 @@ const calculateInterest = (
   interestRate: number
 ): number => {
 
-
   return 0;
 };
 
@@ -130,7 +134,11 @@ const interchange = () => {
 
 const borrow = async () => {
   if (!store.state.ethAddress || !store.state.suiAddress) {
-
+    notify.push({
+      title: 'Connect your wallets first!',
+      description: 'Then try again.',
+      category: 'error'
+    });
     return;
   }
 
@@ -139,7 +147,11 @@ const borrow = async () => {
   }
 
   if (!loan.value.amountIn || loan.value.amountIn == 0) {
-
+    notify.push({
+      title: 'Enter a valid amount!',
+      description: 'Then try again.',
+      category: 'error'
+    });
     return;
   }
 
@@ -170,6 +182,8 @@ const borrow = async () => {
       // save a new loan.
       saveNewLoan(loan.value);
 
+      loan.value.amountIn = undefined;
+
       // update all loans.
       myLoans.value = getAllLoans();
     } else {
@@ -181,6 +195,8 @@ const borrow = async () => {
     }
 
     borrowing.value = false;
+
+    return;
   }
 
   // Check for SUI
@@ -189,10 +205,11 @@ const borrow = async () => {
 
     const tx = await suiBorrow(
       loan.value.toChainId,
-      Converter.toWei(loan.value.amountIn.toString()),
+      Converter.toWei(loan.value.amountIn!.toString()),
       token(loan.value.collateral)!.addresses[21],
       token(loan.value.principal)!.addresses[21],
       store.state.suiAddress,
+      addressToBytes32(store.state.ethAddress),
       store.state.suiAdapter
     );
 
@@ -203,12 +220,17 @@ const borrow = async () => {
 
       saveNewLoan(loan.value);
     } else {
-
+      notify.push({
+        title: 'Failed to send transaction.',
+        description: 'Try again.',
+        category: 'error'
+      });
     }
 
     borrowing.value = false;
-  }
 
+    return;
+  }
 };
 
 const repay = async (loan: any, index: number) => {
@@ -373,7 +395,7 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="loan, index in myLoans" :key="index">
-                  <td>{{ index }}</td>
+                  <td>{{ index + 1 }}</td>
                   <td>
                     <div class="table_collateral">
                       <div class="token">
@@ -407,7 +429,7 @@ onMounted(() => {
                   </td>
                   <td>
                     <button @click="repay(loan, index)">
-                      {{ repaying?.valueOf() == index ? "Repay" : "Loading.." }}
+                      {{ repaying?.valueOf() == index ? "Repaying.." : "Repay" }}
                     </button>
                   </td>
                 </tr>

@@ -114,6 +114,7 @@ export async function suiBorrow(
     coinInValue: string,
     coinInType: string,
     coinOutType: string,
+    sender: string,
     receiver: string,
     adapter: any
 ) {
@@ -124,7 +125,7 @@ export async function suiBorrow(
             txb.pure(0) // Wormhole fee.
         ]);
 
-        const [coinIn] = txb.splitCoins(txb.object("0x656f9dd7bbf01bda7e0775018b4b88aa94128e63c0dc97ed113659c6d316fedb"), [
+        const [coinIn] = txb.splitCoins(txb.object("0xa52a8f858eed040e5e0213102b949e609705d805961dddd2acd973fe230e721b"), [
             txb.pure.u64(coinInValue)
         ]);
 
@@ -136,13 +137,15 @@ export async function suiBorrow(
                 txb.object(oracleHolder),
                 txb.object(priceFeedsState),
                 txb.object(theClock),
-                txb.pure.u16(toChainId),
-                coinGas,
-                coinIn,
-                txb.pure.address(receiver)
+                txb.pure(toChainId),
+                txb.object(coinGas),
+                txb.object(coinIn),
+                txb.pure(receiver)
             ],
             typeArguments: [coinInType, coinOutType]
         });
+
+        txb.setGasBudget(50_000_000);
 
         const result = await adapter.signAndExecuteTransactionBlock(
             { transactionBlock: txb }
@@ -179,14 +182,54 @@ export async function suiRepay(
             target: `${ORBITAL_SUI}::orbital::repay`,
             arguments: [
                 txb.object(state),
-                coinGas,
+                txb.object(coinGas),
                 txb.object(wormholeState),
                 txb.object(theClock),
                 txb.object(loan),
-                coinOut
+                txb.object(coinOut),
             ],
             typeArguments: [coinOutType]
         });
+
+        const result = await adapter.signAndExecuteTransactionBlock(
+            { transactionBlock: txb }
+        );
+
+        // Wait for confirmation
+
+        return result.digest;
+    } catch (error) {
+        console.log(error);
+
+        return null;
+    }
+}
+
+export async function suiStakeFrens(
+    status: boolean,
+    receiver: string,
+    adapter: any
+) {
+    try {
+        const txb = new TransactionBlock();
+
+        const [coinGas] = txb.splitCoins(txb.gas, [
+            txb.pure(0) // Wormhole fee.
+        ]);
+
+        txb.moveCall({
+            target: `${ORBITAL_SUI}::orbital::stake_sui_frens`,
+            arguments: [
+                txb.object(state),
+                txb.pure(status),
+                txb.object(coinGas),
+                txb.object(wormholeState),
+                txb.object(theClock),
+                txb.pure(receiver)
+            ]
+        });
+
+        txb.setGasBudget(50_000_000);
 
         const result = await adapter.signAndExecuteTransactionBlock(
             { transactionBlock: txb }

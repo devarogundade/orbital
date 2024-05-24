@@ -148,6 +148,10 @@ module orbital::orbital {
         assert!(owner_cap.admin == tx_context::sender(ctx), 0);
 
         // Add orbital to foreign orbitals
+        if (vec_map::contains(&state.foreign_orbitals, &chain_id)) {
+            state.foreign_orbitals.remove(&chain_id);
+        };
+
         state.foreign_orbitals.insert(chain_id, orbital);
     }
 
@@ -171,6 +175,10 @@ module orbital::orbital {
         };
 
         // Add coin to supported coins
+        if (vec_set::contains(&state.supported_coins, &coin_id)) {
+            state.supported_coins.remove(&coin_id);
+        };
+
         state.supported_coins.insert(coin_id);
 
         bag::add(&mut state.pools, coin_id, new_pool)
@@ -436,6 +444,11 @@ module orbital::orbital {
         // Update nonce tracker.
         state.wormhole_nonce = state.wormhole_nonce + 1;
         
+        // Set stake status
+        if (vec_map::contains(&state.has_staked_frens, &sender)) {
+            state.has_staked_frens.remove(&sender);
+        };
+
         state.has_staked_frens.insert(sender, status);
     }
 

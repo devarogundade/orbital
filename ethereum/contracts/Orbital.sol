@@ -299,7 +299,7 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Check if nonce was executed.
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
-        if (method == ON_REPAY_METHOD) {
+        if (method == ON_AMPLIFY_METHOD) {
             _hasStakedFrens[receiver] = status;
 
             /// @notice Update nonce as executed.
