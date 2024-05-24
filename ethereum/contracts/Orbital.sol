@@ -211,7 +211,7 @@ contract Orbital is IOrbital, Ownable2Step {
         );
 
         /// @notice Get the destination orbital address in bytes32.
-        bytes32 toContractId = _orbitals[loan.toChainId];
+        bytes32 toContractId = _orbitals[loan.fromChainId];
 
         /// @notice Get wormhole messgase fee.
         uint256 wormholeFee = _wormhole.messageFee();
@@ -223,7 +223,7 @@ contract Orbital is IOrbital, Ownable2Step {
         bytes memory payload = abi.encode(
             ON_REPAY_METHOD,
             loanId,
-            loan.toChainId,
+            loan.fromChainId,
             fromContractId,
             toContractId
         );
@@ -243,7 +243,6 @@ contract Orbital is IOrbital, Ownable2Step {
     /// @dev Function will be trigger my orbital reyaler.
     function receiveOnBorrow(
         uint32 wormholeNonce,
-        bytes32 method,
         bytes32 loanId,
         bytes32 receiver,
         uint16 fromChainId,
@@ -254,59 +253,45 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Check if nonce was executed.
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
-        if (method == ON_BORROW_METHOD) {
-            bool result = onBorrow(
-                loanId,
-                receiver,
-                fromChainId,
-                fromContractId,
-                tokenOut,
-                value
-            );
+        bool result = onBorrow(
+            loanId,
+            receiver,
+            fromChainId,
+            fromContractId,
+            tokenOut,
+            value
+        );
 
-            /// @notice Update nonce as executed.
-            _executeds[wormholeNonce] = result;
-        } else {
-            revert("Undefined method");
-        }
+        /// @notice Update nonce as executed.
+        _executeds[wormholeNonce] = result;
     }
 
     /// @dev Function will be trigger my orbital reyaler.
     function receiveOnRepay(
         uint32 wormholeNonce,
-        bytes32 method,
         bytes32 loanId
     ) external override onlyOwner {
         /// @notice Check if nonce was executed.
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
-        if (method == ON_REPAY_METHOD) {
-            bool result = onRepay(loanId);
+        bool result = onRepay(loanId);
 
-            /// @notice Update nonce as executed.
-            _executeds[wormholeNonce] = result;
-        } else {
-            revert("Undefined method");
-        }
+        /// @notice Update nonce as executed.
+        _executeds[wormholeNonce] = result;
     }
 
     function receiveOnStakeSuiFrens(
         uint32 wormholeNonce,
-        bytes32 method,
         bytes32 receiver,
         bool status
     ) external override onlyOwner {
         /// @notice Check if nonce was executed.
         require(!_executeds[wormholeNonce], "Nonce was already executed.");
 
-        if (method == ON_AMPLIFY_METHOD) {
-            _hasStakedFrens[receiver] = status;
+        _hasStakedFrens[receiver] = status;
 
-            /// @notice Update nonce as executed.
-            _executeds[wormholeNonce] = true;
-        } else {
-            revert("Undefined method");
-        }
+        /// @notice Update nonce as executed.
+        _executeds[wormholeNonce] = true;
     }
 
     /// @notice Thus function receives borrow events from foreign orbitals.
@@ -353,7 +338,7 @@ contract Orbital is IOrbital, Ownable2Step {
             state: LoanState.ACTIVE,
             startSecs: block.timestamp,
             interestRate: interestRate,
-            toChainId: fromChainId
+            fromChainId: fromChainId
         });
 
         return true;

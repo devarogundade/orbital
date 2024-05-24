@@ -25,7 +25,7 @@ interface IOrbital {
         LoanState state;
         uint256 startSecs;
         uint256 interestRate;
-        uint16 toChainId;
+        uint16 fromChainId;
     }
 
     function borrow(
@@ -40,7 +40,6 @@ interface IOrbital {
 
     function receiveOnBorrow(
         uint32 wormholeNonce,
-        bytes32 method,
         bytes32 loanId,
         bytes32 receiver,
         uint16 fromChainId,
@@ -49,15 +48,10 @@ interface IOrbital {
         uint256 value
     ) external;
 
-    function receiveOnRepay(
-        uint32 wormholeNonce,
-        bytes32 method,
-        bytes32 loanId
-    ) external;
+    function receiveOnRepay(uint32 wormholeNonce, bytes32 loanId) external;
 
     function receiveOnStakeSuiFrens(
         uint32 wormholeNonce,
-        bytes32 method,
         bytes32 receiver,
         bool status
     ) external;

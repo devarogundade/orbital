@@ -37,6 +37,7 @@ module orbital::orbital {
     const EPoolAlreadyRegistered: u64 = 105;
     const EMethod: u64 = 106;
     const ECoinNotSupported: u64 = 107;
+    const ENotAdmin: u64 = 108;
 
     // cross chain method identifier.
     const ON_BORROW_METHOD: vector<u8> =
@@ -85,7 +86,7 @@ module orbital::orbital {
         state: u8,
         start_secs: u64,
         interest_rate: u64,
-        to_chain_id: u16
+        from_chain_id: u16
     }
 
     public struct OwnerCap has key {
@@ -122,7 +123,7 @@ module orbital::orbital {
         wormhole_state: &WormholeState, 
         ctx: &mut TxContext
     ) {
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         let state: State = State {
             id: object::new(ctx),
@@ -145,7 +146,7 @@ module orbital::orbital {
         orbital: address,
         ctx: &mut TxContext
     ) {
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Add orbital to foreign orbitals
         if (vec_map::contains(&state.foreign_orbitals, &chain_id)) {
@@ -161,7 +162,7 @@ module orbital::orbital {
         interest_rate: u64,
         ctx: &mut TxContext
     ) {
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         let coin_id = get_coin_id<T>();
 
@@ -190,7 +191,7 @@ module orbital::orbital {
         coin: Coin<T>,
         ctx: &mut TxContext
     ) {
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Get coin pool
         let coin_id = get_coin_id<T>();
@@ -220,8 +221,10 @@ module orbital::orbital {
         ctx: &mut TxContext
     ) : bool {        
         // Get coin pool
+        let coin_in_id = get_coin_id<X>();
         let coin_out_id = get_coin_id<Y>();
-        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_out_id);
+
+        let pool = bag::borrow_mut<String, Pool<X>>(&mut state.pools, coin_in_id);
 
         // Get the input coin balance.
         let coin_in_balance = coin::into_balance<X>(coin_in);
@@ -246,7 +249,7 @@ module orbital::orbital {
         balance::join<X>(&mut pool.balance, coin_in_balance);
 
         // Get input amount equivalent of output amount.
-        let amount_out: u64 = estimate_from_to<X,Y>(
+        let amount_out: u64 = estimate_from_to<X, Y>(
             oracle_holder,
             price_feeds_state,
             coin_in_value
@@ -362,13 +365,13 @@ module orbital::orbital {
         let from_contract_id: address = @orbital;
 
         // Get the destination orbital address in bytes32.
-        let to_contract_id: address = *vec_map::get(&state.foreign_orbitals, &loan.to_chain_id);
+        let to_contract_id: address = *vec_map::get(&state.foreign_orbitals, &loan.from_chain_id);
 
         // Build an inter-chain message.
         let mut payload = vector::empty<u8>();
         vector::append(&mut payload, ON_REPAY_METHOD);
         vector::append(&mut payload, loan.foreign_loan_id);
-        vector::append(&mut payload, to_bytes<u16>(&loan.to_chain_id));
+        vector::append(&mut payload, to_bytes<u16>(&loan.from_chain_id));
         vector::append(&mut payload, to_bytes<address>(&from_contract_id));
         vector::append(&mut payload, to_bytes<address>(&to_contract_id));
         vector::append(&mut payload, to_bytes<String>(&coin_out_id));
@@ -457,8 +460,7 @@ module orbital::orbital {
         owner_cap: &OwnerCap,
         state: &mut State,
         nonce: u32,
-        method: vector<u8>,
-        loan_id: vector<u8>,
+        foreign_loan_id: vector<u8>,
         from_chain_id: u16,
         receiver: address,
         coin_out_value: u64,
@@ -466,7 +468,7 @@ module orbital::orbital {
         ctx: &mut TxContext
     ) {
         // Only admin function.
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Check if message was already executed.
         assert!(
@@ -474,16 +476,10 @@ module orbital::orbital {
             EAlreadyExecuted
         );
 
-        // Check the method args is correct.
-        assert!(
-            method == ON_BORROW_METHOD,
-            EMethod
-        );
-
         // Get the execution result.
         let result: bool = on_borrow<Y>(
             state,
-            loan_id,
+            foreign_loan_id,
             from_chain_id,
             the_clock,
             coin_out_value,
@@ -500,23 +496,16 @@ module orbital::orbital {
         owner_cap: &OwnerCap,
         state: &mut State,
         nonce: u32,
-        method: vector<u8>,
         loan: &mut Loan<X>,
         ctx: &mut TxContext
     ) {
         // Only admin function.
-        assert!(owner_cap.admin == tx_context::sender(ctx), 0);
+        assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Check if message was already executed.
         assert!(
             *vec_map::get(&state.executeds, &nonce) == false,
             EAlreadyExecuted
-        );
-
-        // Check the method args is correct.
-        assert!(
-            method == ON_REPAY_METHOD,
-            EMethod
         );
 
         // Get the execution result.
@@ -564,7 +553,7 @@ module orbital::orbital {
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
                 interest_rate: pool.interest_rate,
-                to_chain_id: from_chain_id
+                from_chain_id: from_chain_id
             }
         );
 
