@@ -218,11 +218,6 @@ export const abi = [
             },
             {
                 "internalType": "bytes32",
-                "name": "method",
-                "type": "bytes32"
-            },
-            {
-                "internalType": "bytes32",
                 "name": "loanId",
                 "type": "bytes32"
             },
@@ -266,11 +261,6 @@ export const abi = [
             },
             {
                 "internalType": "bytes32",
-                "name": "method",
-                "type": "bytes32"
-            },
-            {
-                "internalType": "bytes32",
                 "name": "loanId",
                 "type": "bytes32"
             }
@@ -286,11 +276,6 @@ export const abi = [
                 "internalType": "uint32",
                 "name": "wormholeNonce",
                 "type": "uint32"
-            },
-            {
-                "internalType": "bytes32",
-                "name": "method",
-                "type": "bytes32"
             },
             {
                 "internalType": "bytes32",

@@ -2,12 +2,12 @@
 
 [move]
 version = 2
-manifest_digest = "1C4225E185107126D0863331FFD770444F7DCAFCA4B261A8D23C1AE761666F27"
+manifest_digest = "FA471A35E4614418CAE03E98E223A96ACBAE27844ABC6E676988CC7A0E901C10"
 deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
 dependencies = [
   { name = "Sui" },
+  { name = "SupraOracle" },
   { name = "Wormhole" },
-  { name = "supra" },
 ]
 
 [[move.package]]
@@ -23,16 +23,16 @@ dependencies = [
 ]
 
 [[move.package]]
-name = "Wormhole"
-source = { local = "../wormhole" }
+name = "SupraOracle"
+source = { local = "../supra-svalue-feed-framework" }
 
 dependencies = [
   { name = "Sui" },
 ]
 
 [[move.package]]
-name = "supra"
-source = { local = "../supra" }
+name = "Wormhole"
+source = { local = "../wormhole" }
 
 dependencies = [
   { name = "Sui" },
@@ -47,6 +47,6 @@ flavor = "sui"
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd"
-latest-published-id = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd"
+original-published-id = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798"
+latest-published-id = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798"
 published-version = "1"

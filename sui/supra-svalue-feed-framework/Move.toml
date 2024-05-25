@@ -1,14 +1,14 @@
 [package]
-name = "supra"
+name = "SupraOracle"
 edition = "2024.beta"
-published-at = "0xb2133239f65654e65eba7432ed0a5364a2e8a842282fe4aa19daf1132959628b"
+published-at = "0x2c64e2d3eb17daa7d2652e90957c21e8664418aa41092ddd4734fb6d6c61a133"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 
 [addresses]
 sui = "0x2"
-supra = "0xb2133239f65654e65eba7432ed0a5364a2e8a842282fe4aa19daf1132959628b"
+SupraOracle = "0x2c64e2d3eb17daa7d2652e90957c21e8664418aa41092ddd4734fb6d6c61a133"
 
 [dev-dependencies]
 

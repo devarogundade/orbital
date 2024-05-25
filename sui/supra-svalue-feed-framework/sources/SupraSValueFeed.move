@@ -1,9 +1,10 @@
 #[allow(unused_field)]
-module supra::SupraSValueFeed {
+module SupraOracle::SupraSValueFeed {
+
+
     public struct OracleHolder has key, store {
         id: sui::object::UID,
     }
-
     public struct Price has drop {
         pair: u32,
         value: u128,

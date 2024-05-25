@@ -6,7 +6,8 @@
                     <h3>Products</h3>
 
                     <RouterLink to="/borrow">Borrow</RouterLink>
-                    <RouterLink to="/earn">Earn</RouterLink>
+                    <RouterLink to="/amplifier">Amplify your LTV</RouterLink>
+                    <RouterLink to="/faucet">Faucet</RouterLink>
                 </div>
 
                 <div class="page">
@@ -14,21 +15,19 @@
 
                     <a target="_blank" href="/">Pitch deck</a>
                     <a target="_blank" href="/">Demo</a>
-                    <a target="_blank" href="/">Audits</a>
                 </div>
 
                 <div class="page">
                     <h3>About</h3>
 
-                    <RouterLink to="/borrow">Team</RouterLink>
-                    <RouterLink to="/earn">Contact</RouterLink>
+                    <a target="_blank" href="https://www.linkedin.com/in/devarogundade/">LinkedIn</a>
                 </div>
 
                 <div class="page">
                     <h3>Socials</h3>
 
-                    <a target="_blank" href="/">X (formely twitter)</a>
-                    <a target="_blank" href="/">GitHub</a>
+                    <a target="_blank" href="https://x.com/myorbital_xyz/">X (formely twitter)</a>
+                    <a target="_blank" href="https://github.com/devarogundade/orbital/">GitHub</a>
                 </div>
             </footer>
         </div>

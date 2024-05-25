@@ -6,8 +6,8 @@ import { config } from './config';
 
 export const defaultInterestRate = 10000000000;
 
-const ORBITAL_SUI = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd";
-export const ORBITAL_AVAX = '0xdD7276F4e1983006033d583426e0D7947A7c14c8';
+const ORBITAL_SUI = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798";
+export const ORBITAL_AVAX = '0x5B580c65f9174aE942a38e722A8D92fbC89CF5eB';
 
 export function addressToBytes32(address: string): string {
     // Remove the '0x' prefix if present
@@ -103,10 +103,10 @@ export async function ethRepay(
 
 // SUI DEPS //
 
-const state: string = "0x6ceebbd7158f29a62b0dbb2f277d24089f01bb7aa12824ea28cf6664854624a7";
+const state: string = "0x95bc176fa20d51180d2cd84cab76d239f1ddac6e73ff175c9ae5362ac3307603";
 const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
-const oracleHolder: string = "0x7ab6aa7c4f8ec79c630dc560ae34bd745a035c5a9ab9143b90b504399a4f1040";
-const priceFeedsState: string = "0xc51ecfe4b7499c3ffbaaf9ac2a5b4c197e657e8ce468c8919610eab01227e720";
+const oracleHolder: string = "0x87ef65b543ecb192e89d1e6afeaf38feeb13c3a20c20ce413b29a9cbfbebd570";
+const priceFeedsState: string = "0x69b0c16d85cfb83b232fde94828a274486b434d47ea1d813543f63633b52c72e";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 export async function suiBorrow(
@@ -125,7 +125,7 @@ export async function suiBorrow(
             txb.pure(0) // Wormhole fee.
         ]);
 
-        const [coinIn] = txb.splitCoins(txb.object("0xa52a8f858eed040e5e0213102b949e609705d805961dddd2acd973fe230e721b"), [
+        const [coinIn] = txb.splitCoins(txb.object("0xcb5f656966dcd738eb916fe88b31edeb8bd7ee7a879fd2f60aecb0e0c1441a2e"), [
             txb.pure.u64(coinInValue)
         ]);
 

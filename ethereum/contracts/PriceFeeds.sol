@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity <=0.8.24;
 
-import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
+import {AddressToBytes32} from "./libraries/AddressToBytes32.sol";
 
+import {IPriceFeeds} from "./interfaces/IPriceFeeds.sol";
 import {ISupraSValueFeed} from "./interfaces/ISupraSValueFeed.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract PriceFeeds is IPriceFeeds, Ownable2Step {
+    using AddressToBytes32 for bytes32;
+    using AddressToBytes32 for address;
+
     ISupraSValueFeed private _sValueFeed;
 
     /// @notice
@@ -19,10 +23,10 @@ contract PriceFeeds is IPriceFeeds, Ownable2Step {
 
     /// @dev
     function updateFeedId(
-        bytes32 tokenId,
+        address tokenId,
         uint256 priceId
     ) external override onlyOwner {
-        _priceIds[tokenId] = priceId;
+        _priceIds[tokenId.addressToBytes32()] = priceId;
     }
 
     /// @notice

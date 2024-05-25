@@ -8,7 +8,7 @@ authors = ["Ibrahim Arogundade (devarogundade@gmail.com)"]
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 Wormhole = { local = '../wormhole' }
-supra = { local = '../supra' }
+SupraOracle = { local = '../supra-svalue-feed-framework' }
 
 [addresses]
 sui = "0x2"

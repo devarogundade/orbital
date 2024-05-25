@@ -17,7 +17,7 @@ module orbital::orbital {
     use sui::balance::{Self, Supply, Balance};
 
     /// @dev price feeds deps
-    use supra::SupraSValueFeed::{OracleHolder};
+    use SupraOracle::SupraSValueFeed::{OracleHolder};
 
     /// @dev wormhole deps
     use wormhole::bytes::{Self};
@@ -110,12 +110,12 @@ module orbital::orbital {
     ////////////////////////////////
     
     fun init(ctx: &mut TxContext) {
-        let owner_cap: OwnerCap = OwnerCap {
-            id: object::new(ctx),
-            admin: tx_context::sender(ctx)
-        };
-
-        transfer::share_object(owner_cap)
+        transfer::share_object(
+            OwnerCap {
+                id: object::new(ctx),
+                admin: tx_context::sender(ctx)
+            }
+        );
     }
 
     public entry fun init_state(
@@ -234,7 +234,7 @@ module orbital::orbital {
 
         let sender = tx_context::sender(ctx);
 
-        // Check if the token is supported.
+        // Check if the coin in and out are supported.
         assert!(
             is_coin_supported<X>(state.supported_coins), 
             ECoinNotSupported
@@ -258,8 +258,10 @@ module orbital::orbital {
         // Calculate amount out with LTV, i.e 80% of the actual value.
         let mut bonus_ltv: u8 = 0;
 
-        if (*vec_map::get(&state.has_staked_frens, &sender)) {
-            bonus_ltv = bonus_ltv + 10; // 10 percent
+        if (vec_map::contains(&state.has_staked_frens, &sender)) {
+            if (*vec_map::get(&state.has_staked_frens, &sender)) {
+                bonus_ltv = bonus_ltv + 10; // 10 percent
+            };
         };
 
         let (loan, _) = split_amount(amount_out, (LTV + bonus_ltv));
@@ -471,10 +473,12 @@ module orbital::orbital {
         assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Check if message was already executed.
-        assert!(
-            *vec_map::get(&state.executeds, &nonce) == false,
-            EAlreadyExecuted
-        );
+        if (vec_map::contains(&state.executeds, &nonce)) {
+            assert!(
+                *vec_map::get(&state.executeds, &nonce) == false,
+                EAlreadyExecuted
+            );
+        };
 
         // Get the execution result.
         let result: bool = on_borrow<Y>(
@@ -503,10 +507,12 @@ module orbital::orbital {
         assert!(owner_cap.admin == tx_context::sender(ctx), ENotAdmin);
 
         // Check if message was already executed.
-        assert!(
-            *vec_map::get(&state.executeds, &nonce) == false,
-            EAlreadyExecuted
-        );
+        if (vec_map::contains(&state.executeds, &nonce)) {
+            assert!(
+                *vec_map::get(&state.executeds, &nonce) == false,
+                EAlreadyExecuted
+            );
+        };
 
         // Get the execution result.
         let result: bool = on_repay<X>(
@@ -546,7 +552,7 @@ module orbital::orbital {
         // Save loan object to sender.
         transfer::share_object(
             ForeignLoan<Y> {
-                id: object::new(ctx),
+                id: object::new(ctx), // Can't use foreign_loan_id as UID
                 foreign_loan_id: foreign_loan_id,
                 receiver: receiver,
                 coin_out_value: coin_out_value,

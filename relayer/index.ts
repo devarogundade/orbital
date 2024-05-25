@@ -22,9 +22,9 @@ dotenv.config();
 
 // Orbital contract addresses //
 
-const ORBITAL_SUI = "0xba2ec7f4380343fe672a76fe0f334e4dc26e125f617d8e0a32d46c1ef36923bd";
-const ORBITAL_SUI_EMITTER = "0xb6888ee0f6d3f4c816c4e8c71771879b60c87fd839e291e7bd10ca27ba0ceb23";
-const ORBITAL_AVAX = "0xdD7276F4e1983006033d583426e0D7947A7c14c8";
+const ORBITAL_SUI = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798";
+const ORBITAL_SUI_EMITTER = "0x558c271d84cdeb5658e9ae7bc119cb9b8276123f51c71eb011a38c2d0425112a";
+const ORBITAL_AVAX = "0x5B580c65f9174aE942a38e722A8D92fbC89CF5eB";
 
 // Cross chain method identifiers //
 const ON_BORROW_METHOD =
@@ -66,22 +66,16 @@ const ON_AMPLIFY_METHOD =
                 console.log('Not payload was sent: ', vaa);
                 return;
             }
-
-            const web3 = new Web3();
-
             // Parse payload to HEX format.
             const hexPayload = '0x' + vaa?.payload.toString('hex');
 
-            console.log('[new vaa]: ', hexPayload);
+            console.log('⚡[new vaa]: ', hexPayload);
 
             // Check for emitter chain.
             if (vaa?.emitterChain == CHAIN_ID_SUI) {
                 // @dev Get the VAA method.
-                if (hexPayload.startsWith(ON_BORROW_METHOD)) {
-                    const params = web3.eth.abi.decodeParameters(
-                        ['bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'string', 'uint64'],
-                        hexPayload
-                    );
+                if (hexPayload.startsWith(removeTrailingZeros(ON_BORROW_METHOD))) {
+                    const params: any[] = [];
 
                     const tx = await signOnBorrowTransactionOnEth(
                         vaa.nonce,
@@ -89,7 +83,7 @@ const ON_AMPLIFY_METHOD =
                         params[3],
                         CHAIN_ID_SUI,
                         params[5],
-                        getDefaultEthCoinInType(),
+                        getDefaultEthTokenIn(),
                         params[8]
                     );
 
@@ -100,10 +94,7 @@ const ON_AMPLIFY_METHOD =
 
                 // @dev Get the VAA method.
                 if (hexPayload.startsWith(removeTrailingZeros(ON_REPAY_METHOD))) {
-                    const params = web3.eth.abi.decodeParameters(
-                        ['bytes32', 'bytes32', 'uint16', 'bytes32', 'bytes32', 'string'],
-                        hexPayload
-                    );
+                    const params: any[] = [];
 
                     const tx = await signOnRepayTransactionOnEth(
                         vaa.nonce,
@@ -130,6 +121,8 @@ const ON_AMPLIFY_METHOD =
                     return;
                 }
             } else if (vaa?.emitterChain == CHAIN_ID_AVAX) {
+                const web3 = new Web3();
+
                 // @dev Get the VAA method.
                 if (hexPayload.startsWith(removeTrailingZeros(ON_BORROW_METHOD))) {
                     const params = web3.eth.abi.decodeParameters(
@@ -215,8 +208,8 @@ const ON_AMPLIFY_METHOD =
 
 // SUI DEPS //
 
-const state: string = "0x6ceebbd7158f29a62b0dbb2f277d24089f01bb7aa12824ea28cf6664854624a7";
-const ownerCap: string = "0x12798cc5de91508e71986012fa85fc1357d7ef784d0ce38d3df0d2dd4636f69a";
+const state: string = "0x95bc176fa20d51180d2cd84cab76d239f1ddac6e73ff175c9ae5362ac3307603";
+const ownerCap: string = "0xdaa5474a7612f2ace0370e0962a3fd3701a3989215e67557fda070b2395b7f9e";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 // SUI TRANSACTIONS //
@@ -242,7 +235,6 @@ async function signOnBorrowTransactionOnSui(
                 txb.object(ownerCap),
                 txb.object(state),
                 txb.pure.u32(nonce),
-                txb.pure(bcs.vector(bcs.u8()).serialize(hexToUint8Array(ON_BORROW_METHOD))),
                 txb.pure(bcs.vector(bcs.u8()).serialize(hexToUint8Array(loanId))),
                 txb.pure.u16(fromChainId),
                 txb.pure.address(receiver),
@@ -286,12 +278,11 @@ async function signOnRepayTransactionOnSui(
         const txb = new TransactionBlock();
 
         txb.moveCall({
-            target: `${ORBITAL_SUI}::orbital::receive_on_borrow`,
+            target: `${ORBITAL_SUI}::orbital::receive_on_repay`,
             arguments: [
                 txb.object(ownerCap),
                 txb.object(state),
                 txb.pure(nonce),
-                txb.pure(ON_REPAY_METHOD),
                 txb.object(loan)
             ],
             typeArguments: [coinInType]
@@ -341,7 +332,6 @@ async function signOnBorrowTransactionOnEth(
         // estimate base eth gas fee.
         const gas = await orbital.methods.receiveOnBorrow(
             nonce,
-            ON_BORROW_METHOD,
             loanId,
             receiver,
             fromChainId,
@@ -356,7 +346,6 @@ async function signOnBorrowTransactionOnEth(
         // call the transaction.
         const { transactionHash } = await orbital.methods.receiveOnBorrow(
             nonce,
-            ON_BORROW_METHOD,
             loanId,
             receiver,
             fromChainId,
@@ -397,7 +386,6 @@ async function signOnRepayTransactionOnEth(
         // estimate base eth gas fee.
         const gas = await orbital.methods.receiveOnRepay(
             nonce,
-            ON_REPAY_METHOD,
             loanId
         ).estimateGas({ from: ethSigner.address });
 
@@ -407,7 +395,6 @@ async function signOnRepayTransactionOnEth(
         // call the transaction.
         const { transactionHash } = await orbital.methods.receiveOnRepay(
             nonce,
-            ON_REPAY_METHOD,
             loanId
         ).send({
             from: ethSigner.address,
@@ -444,7 +431,6 @@ async function signOnAmplifyTransactionOnEth(
         // estimate base eth gas fee.
         const gas = await orbital.methods.receiveOnStakeSuiFrens(
             nonce,
-            ON_AMPLIFY_METHOD,
             receiver,
             status
         ).estimateGas({ from: ethSigner.address });
@@ -455,7 +441,6 @@ async function signOnAmplifyTransactionOnEth(
         // call the transaction.
         const { transactionHash } = await orbital.methods.receiveOnStakeSuiFrens(
             nonce,
-            ON_AMPLIFY_METHOD,
             receiver,
             status
         ).send({
@@ -484,8 +469,23 @@ function getDefaultSUICoinOutType(): string {
     return `${faucet}::btc::BTC`;
 }
 
-function getDefaultEthCoinInType(): string {
-    return "0x000000000000000000000000FD132250838394168dFC2Da524C5Ee612715c431";
+function getDefaultEthTokenIn(): string {
+    return addressToBytes32("0x49321b62D46A72d9F0D0275f1CDBED2CB7753306");
+}
+
+function getDefaultEthTokenOut(): string {
+    return addressToBytes32("0xB01c55634AB82268d0C0F915598858dEBD40d5C5");
+}
+
+function addressToBytes32(address: string): string {
+    // Remove the '0x' prefix if present
+    const strippedAddress = address.startsWith('0x') ? address.slice(2) : address;
+
+    // Pad the address with leading zeros to ensure it is 32 bytes long
+    const paddedAddress = strippedAddress.padStart(64, '0');
+
+    // Add the '0x' prefix back
+    return '0x' + paddedAddress;
 }
 
 function hexToUint8Array(hex: string): number[] {

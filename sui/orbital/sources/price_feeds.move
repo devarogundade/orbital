@@ -3,7 +3,7 @@
 module orbital::price_feeds {
     use sui::object::UID;
     use sui::vec_map::{Self, VecMap};
-    use supra::SupraSValueFeed::{get_price as get_oracle_price, OracleHolder};
+    use SupraOracle::SupraSValueFeed::{get_price as get_oracle_price, OracleHolder};
     use std::string::{Self, String};
 
     use orbital::coin_utils::{get_coin_id};
@@ -78,12 +78,5 @@ module orbital::price_feeds {
         let amount_out = ((price_in as u64) * amount_in) / (price_out as u64);
 
         amount_out
-    }
-
-    #[test]
-    fun init_for_testing(
-        ctx: &mut TxContext
-    ) {
-        init(ctx)
     }
 }

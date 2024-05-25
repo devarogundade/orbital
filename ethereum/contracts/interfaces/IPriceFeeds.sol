@@ -2,7 +2,7 @@
 pragma solidity <=0.8.24;
 
 interface IPriceFeeds {
-    function updateFeedId(bytes32 tokenId, uint256 priceId) external;
+    function updateFeedId(address tokenId, uint256 priceId) external;
 
     function getPrice(bytes32 tokenId) external view returns (uint256);
 
