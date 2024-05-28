@@ -12,6 +12,7 @@ import { approve, getAllowance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
 import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
+import InterChangeIcon from "@/components/icons/InterChangeIcon.vue";
 
 const emit = defineEmits(['close']);
 
@@ -558,7 +559,7 @@ onMounted(() => {
 
           <div class="interchange">
             <button @click="interchange" :style="loan.interchange ? 'rotate: 180deg;' : ''">
-              /
+              <InterChangeIcon />
             </button>
           </div>
 
