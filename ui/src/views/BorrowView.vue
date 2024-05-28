@@ -11,6 +11,7 @@ import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan } from '@/script
 import { approve, getAllowance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
+import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
 
 const emit = defineEmits(['close']);
 
@@ -510,6 +511,7 @@ onMounted(() => {
                 <div class="chain">
                   <img :src="chain(loan.fromChainId)!.image" alt="">
                   <p>{{ chain(loan.fromChainId)!.name }}</p>
+                  <ArrowDownIcon />
                 </div>
               </div>
 
@@ -528,6 +530,7 @@ onMounted(() => {
                   <div class="token">
                     <img :src="token(loan.collateral)!.image" alt="">
                     <p>{{ token(loan.collateral)!.symbol }}</p>
+                    <ArrowDownIcon />
                   </div>
                 </div>
               </div>
@@ -555,6 +558,7 @@ onMounted(() => {
                 <div class="chain">
                   <img :src="chain(loan.toChainId)!.image" alt="">
                   <p>{{ chain(loan.toChainId)!.name }}</p>
+                  <ArrowDownIcon />
                 </div>
               </div>
 
@@ -573,6 +577,7 @@ onMounted(() => {
                   <div class="token">
                     <img :src="token(loan.principal)!.image" alt="">
                     <p>{{ token(loan.principal)!.symbol }}</p>
+                    <ArrowDownIcon />
                   </div>
                 </div>
               </div>

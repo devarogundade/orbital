@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
+</script>
+
 <template>
   <section>
     <div class="app_width">
@@ -14,6 +18,7 @@
                 <div class="chain">
                   <img src="/images/sui.png" alt="">
                   <p>SUI</p>
+                  <ArrowDownIcon />
                 </div>
               </div>
 
@@ -21,8 +26,9 @@
                 <div class="input">
                   <div></div>
                   <div class="token">
-                    <img src="/images/fud.png" alt="">
-                    <p>Fud</p>
+                    <img src="/images/usdt.png" alt="">
+                    <p>USDT</p>
+                    <ArrowDownIcon />
                   </div>
                 </div>
               </div>
@@ -34,6 +40,7 @@
                 <div class="chain">
                   <img src="/images/avax.png" alt="">
                   <p>Avalanche</p>
+                  <ArrowDownIcon />
                 </div>
               </div>
 
@@ -42,7 +49,8 @@
                   <div></div>
                   <div class="token">
                     <img src="/images/fud.png" alt="">
-                    <p>USDT</p>
+                    <p>FUD</p>
+                    <ArrowDownIcon />
                   </div>
                 </div>
               </div>
