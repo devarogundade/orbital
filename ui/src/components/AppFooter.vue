@@ -6,14 +6,16 @@
                     <h3>Products</h3>
 
                     <RouterLink to="/borrow">Borrow</RouterLink>
-                    <RouterLink to="/amplifier">Amplify your LTV</RouterLink>
+                    <RouterLink to="/flash-loan">Flash Loan</RouterLink>
                     <RouterLink to="/faucet">Faucet</RouterLink>
                 </div>
 
                 <div class="page">
                     <h3>Resources</h3>
 
-                    <a target="_blank" href="/">Pitch deck</a>
+                    <a target="_blank"
+                        href="https://www.canva.com/design/DAGGblBNCjA/EmcgD9-GhLpwln53hwpkmw/view?utm_content=DAGGblBNCjA&utm_campaign=designshare&utm_medium=link&utm_source=editor">Pitch
+                        deck</a>
                     <a target="_blank" href="/">Demo</a>
                 </div>
 
@@ -39,12 +41,14 @@ section {
     margin-top: 100px;
 }
 
+.app_width {
+    display: flex;
+    justify-content: center;
+}
+
 footer {
     background: var(--background-light);
-    border-left: 4px solid var(--background-lighter);
-    border-right: 4px solid var(--background-lighter);
-    border-top: 4px solid var(--background-lighter);
-    padding: 40px 40px 80px 40px;
+    padding: 50px;
     border-radius: 24px 24px 0 0;
     display: flex;
     flex-wrap: wrap;
@@ -52,7 +56,7 @@ footer {
 }
 
 .page {
-    min-width: 200px;
+    min-width: 260px;
     max-width: 100%;
     display: flex;
     flex-direction: column;

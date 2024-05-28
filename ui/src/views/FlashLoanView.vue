@@ -1,47 +1,12 @@
-<script setup lang="ts">
-import { suiStakeFrens } from '@/scripts/loan';
-import { ref } from 'vue';
-// @ts-ignore
-import { useStore } from 'vuex';
-import { key } from '../store';
-import { notify } from '@/reactives/notify';
-import { addressToBytes32 } from '@/scripts/loan';
-
-const store = useStore(key);
-
-const staking = ref<boolean>(false);
-
-const stake = async () => {
-  staking.value = true;
-
-  const tx = await suiStakeFrens(
-    true,
-    addressToBytes32(store.state.ethAddress),
-    store.state.suiAdapter
-  );
-
-  if (tx) {
-
-
-  } else {
-    notify.push({
-      title: 'Failed to send transaction.',
-      description: 'Try again.',
-      category: 'error'
-    });
-  }
-
-  staking.value = false;
-
-  return;
-};
-</script>
-
 <template>
   <section>
     <div class="app_width">
       <div class="base_container">
         <div class="borrow_container">
+          <div class="blur">
+            <p>Work In Progress.</p>
+          </div>
+
           <div class="borrow">
             <div class="principal">
               <div class="from_chain">
@@ -53,12 +18,31 @@ const stake = async () => {
               </div>
 
               <div class="input_token">
-                <p>Select NFT:</p>
                 <div class="input">
                   <div></div>
                   <div class="token">
-                    <img src="/images/suifrens.svg" alt="">
-                    <p>SUIFRENS</p>
+                    <img src="/images/fud.png" alt="">
+                    <p>Fud</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="principal">
+              <div class="from_chain">
+                <p>Chain:</p>
+                <div class="chain">
+                  <img src="/images/avax.png" alt="">
+                  <p>Avalanche</p>
+                </div>
+              </div>
+
+              <div class="input_token">
+                <div class="input">
+                  <div></div>
+                  <div class="token">
+                    <img src="/images/fud.png" alt="">
+                    <p>USDT</p>
                   </div>
                 </div>
               </div>
@@ -67,12 +51,12 @@ const stake = async () => {
 
           <div class="details">
             <div class="fee">
-              <p>Boost your LTV above 80%</p>
-              <p>Estimated increase of <span>+5%</span> on your LTV.</p>
+              <p>Cross-chain messaging fee.</p>
+              <p>Estimated at <span>0 SUI</span> on SUI.</p>
             </div>
 
             <div class="action">
-              <button @click="stake">{{ staking.valueOf() ? 'Staking..' : 'Stake' }}</button>
+              <button>Execute</button>
             </div>
           </div>
         </div>
@@ -97,6 +81,23 @@ section {
   align-items: center;
   flex-direction: column;
   gap: 5px;
+  position: relative;
+}
+
+.blur {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  color: var(--tx-normal);
+  font-size: 24px;
+  font-weight: 500px;
+  text-align: center;
 }
 
 .borrow {
@@ -230,7 +231,6 @@ section {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 200px;
 }
 
 .token p {

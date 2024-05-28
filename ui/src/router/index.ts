@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '@/views/HomeView.vue';
 import BorrowView from '@/views/BorrowView.vue';
-import AmplifyView from '@/views/AmplifyView.vue';
+import FlashLoanView from '@/views/FlashLoanView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,7 +26,7 @@ const router = createRouter({
     {
       path: '/flash-loan',
       name: 'flash-loan',
-      component: AmplifyView
+      component: FlashLoanView
     }
   ]
 });

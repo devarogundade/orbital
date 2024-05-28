@@ -52,7 +52,7 @@ const getSwiper = (swiperInstance: SwiperType) => {
         <div class="use_case">
           <div class="borrow">
             <div class="borrow_text">
-              <h3>Borrow</h3>
+              <h3>Cross-Chain Loans</h3>
               <p>Bridge your assets seamlessly with our cross-chain lending protocol on Sui: Where liquidity meets
                 opportunity.</p>
               <RouterLink to="/borrow"><button>$ cd ../borrow</button></RouterLink>
@@ -69,8 +69,9 @@ const getSwiper = (swiperInstance: SwiperType) => {
             </div>
 
             <div class="lend_text">
-              <h3>Flash loan</h3>
-              <p>Stake your SUIFRENS NFT to increase your Loan-To-Value ratio above 80%.</p>
+              <h3>Cross-Chain Flash Loans</h3>
+              <p>A flash loan is a type of uncollateralized loan that allows you to borrow and repay within a single
+                blockchain transaction.</p>
               <RouterLink to="/flash-loan"><button>$ cd ../flash_loans</button></RouterLink>
             </div>
           </div>
@@ -168,7 +169,7 @@ section {
 .borrow_text h3 {
   font-size: 40px;
   font-weight: 500;
-  color: #db8f0c;
+  color: #C88579;
 }
 
 .borrow_text p {
@@ -217,7 +218,7 @@ section {
 .lend_text h3 {
   font-size: 40px;
   font-weight: 500;
-  color: rgb(128, 175, 209);
+  color: #699F8B;
 }
 
 .lend_text p {
