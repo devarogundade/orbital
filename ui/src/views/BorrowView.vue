@@ -586,7 +586,7 @@ onMounted(() => {
 
           <div class="details">
             <div class="fee">
-              <p>Cross-chain messaging fee.</p>
+              <p>Cross-chain fee.</p>
               <p>Estimated at <span>0 {{ chain(loan.fromChainId)!.native }}</span> on {{
                 chain(loan.fromChainId)!.name }}.</p>
             </div>

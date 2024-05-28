@@ -59,7 +59,7 @@ import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
 
           <div class="details">
             <div class="fee">
-              <p>Cross-chain messaging fee.</p>
+              <p>Cross-chain fee.</p>
               <p>Estimated at <span>0 SUI</span> on SUI.</p>
             </div>
 
