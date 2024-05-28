@@ -24,6 +24,11 @@ const repaying = ref<string | null>(null);
 const ethBalances = ref({ usdt: '0', fud: '0' });
 const suiBalances = ref({ usdt: '0', fud: '0' });
 
+const fromChaining = ref(false);
+const fromTokening = ref(false);
+const toChaining = ref(false);
+const toTokening = ref(false);
+
 const loan = ref<Loan>({
   loanId: null,
   amountIn: null,
@@ -508,10 +513,17 @@ onMounted(() => {
 
               <div class="from_chain">
                 <p>From:</p>
-                <div class="chain">
+                <div class="chain" @click="fromChaining = !fromChaining">
                   <img :src="chain(loan.fromChainId)!.image" alt="">
                   <p>{{ chain(loan.fromChainId)!.name }}</p>
                   <ArrowDownIcon />
+
+                  <div class="dropdown" v-if="fromChaining">
+                    <div class="chain">
+                      <img :src="chain(loan.fromChainId)!.image" alt="">
+                      <p>{{ chain(loan.fromChainId)!.name }}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -527,10 +539,17 @@ onMounted(() => {
                 </div>
                 <div class="input">
                   <input min="0" v-model="loan.amountIn" type="number" placeholder="0.00" />
-                  <div class="token">
+                  <div class="token" @click="fromTokening = !fromTokening">
                     <img :src="token(loan.collateral)!.image" alt="">
                     <p>{{ token(loan.collateral)!.symbol }}</p>
                     <ArrowDownIcon />
+
+                    <div class="dropdown" v-if="fromTokening">
+                      <div class="token">
+                        <img :src="token(loan.collateral)!.image" alt="">
+                        <p>{{ token(loan.collateral)!.symbol }}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -555,10 +574,17 @@ onMounted(() => {
 
               <div class="from_chain">
                 <p>Destination:</p>
-                <div class="chain">
+                <div class="chain" @click="toChaining = !toChaining">
                   <img :src="chain(loan.toChainId)!.image" alt="">
                   <p>{{ chain(loan.toChainId)!.name }}</p>
                   <ArrowDownIcon />
+
+                  <div class="dropdown" v-if="toChaining">
+                    <div class="chain">
+                      <img :src="chain(loan.toChainId)!.image" alt="">
+                      <p>{{ chain(loan.toChainId)!.name }}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -574,10 +600,17 @@ onMounted(() => {
                 </div>
                 <div class="input">
                   <input type="number" :value="loan.amountOut" disabled placeholder="0.00" />
-                  <div class="token">
+                  <div class="token" @click="toTokening = !toTokening">
                     <img :src="token(loan.principal)!.image" alt="">
                     <p>{{ token(loan.principal)!.symbol }}</p>
                     <ArrowDownIcon />
+
+                    <div class="dropdown" v-if="toTokening">
+                      <div class="token">
+                        <img :src="token(loan.principal)!.image" alt="">
+                        <p>{{ token(loan.principal)!.symbol }}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -860,6 +893,28 @@ section {
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: 35px;
+  left: 0;
+}
+
+.dropdown>div {
+  background: var(--background-light) !important;
+  border: 1px solid var(--background);
+}
+
+.token .dropdown {
+  top: 45px;
+}
+
+.dropdown .token {
+  height: 35px !important;
+  border-radius: 6px;
 }
 
 .borrow_container .chain p {
@@ -918,6 +973,8 @@ input {
   display: flex;
   align-items: center;
   gap: 10px;
+  cursor: pointer;
+  position: relative;
 }
 
 .borrow_container .token p {
