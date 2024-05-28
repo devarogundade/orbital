@@ -3,7 +3,6 @@ name = "orbital"
 edition = "2024.beta"
 license = "UNLICENSED"
 authors = ["Ibrahim Arogundade (devarogundade@gmail.com)"]
-# published-at = "0xfb77bc2d72a4e1ca782ffe89cc18e1631621548939e108de053c7f1618dc0fdd"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }

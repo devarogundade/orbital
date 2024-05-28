@@ -44,17 +44,12 @@ interface IOrbital {
         bytes32 receiver,
         uint16 fromChainId,
         bytes32 fromContractId,
+        bytes32 tokenIn,
         bytes32 tokenOut,
         uint256 value
     ) external;
 
     function receiveOnRepay(uint32 wormholeNonce, bytes32 loanId) external;
-
-    function receiveOnStakeSuiFrens(
-        uint32 wormholeNonce,
-        bytes32 receiver,
-        bool status
-    ) external;
 
     function getAmountOut(
         bytes32 tokenIn,

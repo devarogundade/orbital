@@ -24,8 +24,8 @@ const router = createRouter({
       component: BorrowView
     },
     {
-      path: '/amplifier',
-      name: 'amplifier',
+      path: '/flash-loan',
+      name: 'flash-loan',
       component: AmplifyView
     }
   ]

@@ -13,18 +13,36 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
 
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// @ts-ignore
+import serviceAccount from './serviceAccountKey.json';
+
+initializeApp({
+    credential: cert(serviceAccount as any)
+});
+
+const db = getFirestore();
+
 // Ethereum contract abi //
 import ethOrbitalAbi from "./abis/ethereum/orbital.json";
 
 import http from 'http';
+import { parseSuiOnBorrowHex } from "./utils/sui_on_borrow_parser";
+import { parseSuiOnRepayHex } from "./utils/sui_on_repay_parser";
 
 dotenv.config();
 
+// Firestore
+
+const LOAN_COLLECTION = "loans";
+
 // Orbital contract addresses //
 
-const ORBITAL_SUI = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798";
-const ORBITAL_SUI_EMITTER = "0x558c271d84cdeb5658e9ae7bc119cb9b8276123f51c71eb011a38c2d0425112a";
-const ORBITAL_AVAX = "0x5B580c65f9174aE942a38e722A8D92fbC89CF5eB";
+const ORBITAL_SUI = "0x0cb3ed8d5c81bf10b99844d63844e764fe689e507b2aa7edc0a28cfae3d1c878";
+const ORBITAL_SUI_EMITTER = "0x9a5fff274ff3061d4e06ee5ecd904a0c5233f94cf0eaf7b4e52a06315be1d0f1";
+const ORBITAL_AVAX = "0x9d18ab7AA68Ffcd6192e775E26c2631c8F66334e";
 
 // Cross chain method identifiers //
 const ON_BORROW_METHOD =
@@ -32,9 +50,6 @@ const ON_BORROW_METHOD =
 
 const ON_REPAY_METHOD =
     "0x4f4e5f52455041595f4d4554484f440000000000000000000000000000000000";
-
-const ON_AMPLIFY_METHOD =
-    "0x4f4e5f44454641554c545f4d4554484f44000000000000000000000000000000";
 
 (async function main() {
     // initialize relayer engine app, pass relevant config options
@@ -68,6 +83,7 @@ const ON_AMPLIFY_METHOD =
             }
             // Parse payload to HEX format.
             const hexPayload = '0x' + vaa?.payload.toString('hex');
+            const sourceTxHash = ctx.sourceTxHash!;
 
             console.log('⚡[new vaa]: ', hexPayload);
 
@@ -75,16 +91,18 @@ const ON_AMPLIFY_METHOD =
             if (vaa?.emitterChain == CHAIN_ID_SUI) {
                 // @dev Get the VAA method.
                 if (hexPayload.startsWith(removeTrailingZeros(ON_BORROW_METHOD))) {
-                    const params: any[] = [];
+                    const params = parseSuiOnBorrowHex(hexPayload);
 
                     const tx = await signOnBorrowTransactionOnEth(
                         vaa.nonce,
-                        params[1],
-                        params[3],
+                        params.loanId,
+                        params.receiver,
                         CHAIN_ID_SUI,
-                        params[5],
+                        params.fromContractId,
                         getDefaultEthTokenIn(),
-                        params[8]
+                        getDefaultEthTokenOut(),
+                        params.coinInValue,
+                        sourceTxHash
                     );
 
                     console.log('⚡Trx hash: ', tx);
@@ -94,29 +112,16 @@ const ON_AMPLIFY_METHOD =
 
                 // @dev Get the VAA method.
                 if (hexPayload.startsWith(removeTrailingZeros(ON_REPAY_METHOD))) {
-                    const params: any[] = [];
+                    const params = parseSuiOnRepayHex(hexPayload);
 
-                    const tx = await signOnRepayTransactionOnEth(
-                        vaa.nonce,
-                        params[1]
-                    );
+                    console.log(params);
 
-                    console.log('⚡Trx hash: ', tx);
+                    // const tx = await signOnRepayTransactionOnEth(
+                    //     vaa.nonce,
+                    //     params.loanId
+                    // );
 
-                    return;
-                }
-
-                // @dev Get the VAA method.
-                if (hexPayload.startsWith(removeTrailingZeros(ON_AMPLIFY_METHOD))) {
-                    const params = splitSuiAmplifierHex(hexPayload);
-
-                    const tx = await signOnAmplifyTransactionOnEth(
-                        vaa.nonce,
-                        params.receiver,
-                        params.status
-                    );
-
-                    console.log('⚡Trx hash: ', tx);
+                    // console.log('⚡Trx hash: ', tx);
 
                     return;
                 }
@@ -136,7 +141,8 @@ const ON_AMPLIFY_METHOD =
                         params[1], // loanId
                         CHAIN_ID_AVAX,
                         params[8], // loan value
-                        getDefaultSUICoinOutType() // tokenOut
+                        getDefaultSUICoinOutType(), // tokenOut
+                        sourceTxHash
                     );
 
                     console.log('⚡Trx hash: ', tx);
@@ -208,9 +214,10 @@ const ON_AMPLIFY_METHOD =
 
 // SUI DEPS //
 
-const state: string = "0x95bc176fa20d51180d2cd84cab76d239f1ddac6e73ff175c9ae5362ac3307603";
-const ownerCap: string = "0xdaa5474a7612f2ace0370e0962a3fd3701a3989215e67557fda070b2395b7f9e";
+const state: string = "0x478d818bb6c5c7e12d0503a5511d4e3157dd867b274bf1159055c07ec04cc268";
+const ownerCap: string = "0x2b8480267d3edf9e2c7441d593d81043139abbeaf81279f2b02fcbae5b159dcf";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
+const faucet = "0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636";
 
 // SUI TRANSACTIONS //
 
@@ -220,7 +227,8 @@ async function signOnBorrowTransactionOnSui(
     loanId: string,
     fromChainId: number,
     coinOutValue: number,
-    coinOutType: string
+    coinOutType: string,
+    txHash: string
 ): Promise<string | null> {
     const rpcUrl = getFullnodeUrl('testnet');
 
@@ -238,7 +246,7 @@ async function signOnBorrowTransactionOnSui(
                 txb.pure(bcs.vector(bcs.u8()).serialize(hexToUint8Array(loanId))),
                 txb.pure.u16(fromChainId),
                 txb.pure.address(receiver),
-                txb.pure.u64(coinOutValue),
+                txb.pure.u128(coinOutValue),
                 txb.object(theClock)
             ],
             typeArguments: [coinOutType]
@@ -251,9 +259,29 @@ async function signOnBorrowTransactionOnSui(
             process.env.SUI_PRIVATE_KEY!!
         );
 
-        const { digest } = await client.signAndExecuteTransactionBlock(
-            { signer: keypair, transactionBlock: txb }
+        const { digest, effects } = await client.signAndExecuteTransactionBlock(
+            { signer: keypair, transactionBlock: txb, options: { showEffects: true } }
         );
+
+        if (effects && effects.created) {
+            for (let index = 0; index < effects.created.length; index++) {
+                const created = effects.created[index];
+                const owner: any = created.owner;
+
+                if ('Shared' in owner && 'initial_shared_version' in owner.Shared) {
+                    const newLoanId = created.reference.objectId;
+
+                    const data = { loanId: newLoanId };
+
+                    // Add a new document in collection "cities" with ID 'LA'
+                    await db.collection(LOAN_COLLECTION).doc(txHash).set(
+                        data, { merge: true }
+                    );
+
+                    break;
+                }
+            }
+        }
 
         await client.waitForTransactionBlock({ digest });
 
@@ -288,6 +316,8 @@ async function signOnRepayTransactionOnSui(
             typeArguments: [coinInType]
         });
 
+        txb.setGasBudget(50_000_000);
+
         // create signer object from private key.
         const keypair = Ed25519Keypair.deriveKeypair(
             process.env.SUI_PRIVATE_KEY!!
@@ -313,9 +343,18 @@ async function signOnBorrowTransactionOnEth(
     receiver: string,
     fromChainId: number,
     fromContractId: string,
+    tokenIn: string,
     tokenOut: string,
-    value: string
+    value: string,
+    txHash: string
 ) {
+    const data = { loanId };
+
+    // Add a new document in collection "loans".
+    await db.collection(LOAN_COLLECTION).doc(txHash).set(
+        data, { merge: true }
+    );
+
     const web3 = new Web3('https://avalanche-fuji-c-chain-rpc.publicnode.com');
 
     const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_AVAX);
@@ -336,6 +375,7 @@ async function signOnBorrowTransactionOnEth(
             receiver,
             fromChainId,
             fromContractId,
+            tokenIn,
             tokenOut,
             value
         ).estimateGas({ from: ethSigner.address });
@@ -350,6 +390,7 @@ async function signOnBorrowTransactionOnEth(
             receiver,
             fromChainId,
             fromContractId,
+            tokenIn,
             tokenOut,
             value
         ).send({
@@ -410,71 +451,22 @@ async function signOnRepayTransactionOnEth(
     }
 }
 
-async function signOnAmplifyTransactionOnEth(
-    nonce: number,
-    receiver: string,
-    status: boolean
-): Promise<string | null> {
-    const web3 = new Web3('https://avalanche-fuji-c-chain-rpc.publicnode.com');
-
-    const orbital = new web3.eth.Contract(ethOrbitalAbi as any, ORBITAL_AVAX);
-
-    // create signer object from private key.
-    const ethSigner = web3.eth.accounts.privateKeyToAccount(
-        process.env.EVM_PRIVATE_KEY!!
-    );
-
-    // add signer to web3.
-    web3.eth.accounts.wallet.add(ethSigner);
-
-    try {
-        // estimate base eth gas fee.
-        const gas = await orbital.methods.receiveOnStakeSuiFrens(
-            nonce,
-            receiver,
-            status
-        ).estimateGas({ from: ethSigner.address });
-
-        // get base eth gas price.
-        const gasPrice = await web3.eth.getGasPrice();
-
-        // call the transaction.
-        const { transactionHash } = await orbital.methods.receiveOnStakeSuiFrens(
-            nonce,
-            receiver,
-            status
-        ).send({
-            from: ethSigner.address,
-            gasPrice: gasPrice.toString(),
-            gas: gas.toString()
-        });
-
-        return transactionHash;
-    } catch (error) {
-        console.error('Transaction: ', error);
-
-        return null;
-    }
-}
-
 // Extraction methods //
-
-const faucet = "0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33";
 
 function getDefaultSUICoinInType(): string {
     return `${faucet}::usdt::USDT`;
 }
 
 function getDefaultSUICoinOutType(): string {
-    return `${faucet}::btc::BTC`;
+    return `${faucet}::fud::FUD`;
 }
 
 function getDefaultEthTokenIn(): string {
-    return addressToBytes32("0x49321b62D46A72d9F0D0275f1CDBED2CB7753306");
+    return addressToBytes32("0xd08080A98d57239Ea7379861Fc1fdDAb190ba287");
 }
 
 function getDefaultEthTokenOut(): string {
-    return addressToBytes32("0xB01c55634AB82268d0C0F915598858dEBD40d5C5");
+    return addressToBytes32("0x70527a5098443849069603C26815705436500565");
 }
 
 function addressToBytes32(address: string): string {
@@ -520,24 +512,6 @@ function hexToUint8Array(hex: string): number[] {
     }
 
     return numberArray;
-}
-
-function splitSuiAmplifierHex(hex: string): { method: string, receiver: string, status: boolean; } {
-    // Remove the '0x' prefix
-    const hexData = hex.slice(2);
-
-    // Extract bytes20 (first 20 bytes, 40 hex characters)
-    const method = '0x' + hexData.slice(0, 40);
-
-    // Extract address (next 20 bytes, 40 hex characters)
-    const receiver = '0x' + hexData.slice(40, 40 + 40);
-
-    // Extract boolean (last byte, 2 hex characters)
-    const booleanByte = hexData.slice(80, 82);
-    const status = booleanByte !== '00';
-
-
-    return { method, receiver, status };
 }
 
 function removeTrailingZeros(bytes32: string): string {

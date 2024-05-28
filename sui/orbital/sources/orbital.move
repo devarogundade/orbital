@@ -99,7 +99,6 @@ module orbital::orbital {
         wormhole_nonce: u32,
         executeds: VecMap<u32, bool>,
         foreign_orbitals: VecMap<u16, address>,
-        has_staked_frens: VecMap<address, bool>,
         supported_coins: VecSet<String>,
         emitter_cap: EmitterCap,
         pools: Bag,
@@ -131,7 +130,6 @@ module orbital::orbital {
             executeds: vec_map::empty(),
             foreign_orbitals: vec_map::empty(),
             supported_coins: vec_set::empty(),
-            has_staked_frens: vec_map::empty(),
             emitter_cap: emitter::new(wormhole_state, ctx),
             pools: bag::new(ctx)
         };
@@ -248,23 +246,20 @@ module orbital::orbital {
         // Increment pool balance.
         balance::join<X>(&mut pool.balance, coin_in_balance);
 
+        // NOTICE WE HAVE USED A SINGLE SOURCE OF TRUTH MODEL
+        // TO MINIMIZE PRICE VARIANCE AS POSSIBLE.
+        // THIS MEANS THAT ALL PRICE CONVERSION IS DONE A
+        // SPECIFIC CHAIN.
+
         // Get input amount equivalent of output amount.
-        let amount_out: u64 = estimate_from_to<X, Y>(
-            oracle_holder,
-            price_feeds_state,
-            coin_in_value
-        );
+        // let amount_out: u64 = estimate_from_to<X, Y>(
+        //     oracle_holder,
+        //     price_feeds_state,
+        //     coin_in_value
+        // );
 
         // Calculate amount out with LTV, i.e 80% of the actual value.
-        let mut bonus_ltv: u8 = 0;
-
-        if (vec_map::contains(&state.has_staked_frens, &sender)) {
-            if (*vec_map::get(&state.has_staked_frens, &sender)) {
-                bonus_ltv = bonus_ltv + 10; // 10 percent
-            };
-        };
-
-        let (loan, _) = split_amount(amount_out, (LTV + bonus_ltv));
+        // let (loan, _) = split_amount(amount_out, LTV);
 
         // Convert this orbital address to type bytes32.
         let from_contract_id: address = @orbital;
@@ -287,8 +282,9 @@ module orbital::orbital {
         vector::append(&mut payload, to_bytes<u16>(&to_chain_id));
         vector::append(&mut payload, to_bytes<address>(&from_contract_id));
         vector::append(&mut payload, to_bytes<address>(&to_contract_id));
+        vector::append(&mut payload, to_bytes<String>(&coin_in_id));
         vector::append(&mut payload, to_bytes<String>(&coin_out_id));
-        vector::append(&mut payload, to_bytes<u64>(&loan));
+        vector::append(&mut payload, to_bytes<u64>(&coin_in_value));
 
         // Get wormhole messgase fee.
         let wormhole_fee_value: u64 = message_fee(wormhole_state);
@@ -408,55 +404,6 @@ module orbital::orbital {
         true
     }
 
-    public entry fun stake_sui_frens(
-        state: &mut State,
-        status: bool,
-        coin_gas: Coin<SUI>, // Message fee.
-        wormhole_state: &mut WormholeState,
-        the_clock: &Clock,
-        receiver: address,
-        ctx: &mut TxContext
-    ) {
-        let sender = tx_context::sender(ctx);
-
-        // Build an inter-chain message.
-        let mut payload = vector::empty<u8>();
-        vector::append(&mut payload, ON_AMPLIFY_METHOD);
-        vector::append(&mut payload, to_bytes<address>(&receiver));
-        vector::append(&mut payload, to_bytes<bool>(&status));
-
-        // Get wormhole messgase fee.
-        let wormhole_fee_value: u64 = message_fee(wormhole_state);
-        
-        // Get the input gas fee.
-        let coin_gas_value = coin::value(&coin_gas);
-
-        // Check the input coin value is enough for message fee.
-        assert!(coin_gas_value >= wormhole_fee_value, EZeroAmount);
-
-        // Publish message on wormhole guardian.
-        publish_message(
-            wormhole_state,
-            coin_gas, // Pay wormhole message fee.
-            prepare_message(
-                &mut state.emitter_cap, 
-                state.wormhole_nonce, 
-                payload
-            ),
-            the_clock
-        );
-
-        // Update nonce tracker.
-        state.wormhole_nonce = state.wormhole_nonce + 1;
-        
-        // Set stake status
-        if (vec_map::contains(&state.has_staked_frens, &sender)) {
-            state.has_staked_frens.remove(&sender);
-        };
-
-        state.has_staked_frens.insert(sender, status);
-    }
-
     // This function receives borrow events from foreign orbitals.
     public entry fun receive_on_borrow<Y>(
         owner_cap: &OwnerCap,
@@ -465,7 +412,7 @@ module orbital::orbital {
         foreign_loan_id: vector<u8>,
         from_chain_id: u16,
         receiver: address,
-        coin_out_value: u64,
+        coin_out_value: u128,
         the_clock: &Clock,        
         ctx: &mut TxContext
     ) {
@@ -480,13 +427,15 @@ module orbital::orbital {
             );
         };
 
+        let coin_out_value_9d = (coin_out_value / 1_000_000_000) as u64;
+
         // Get the execution result.
         let result: bool = on_borrow<Y>(
             state,
             foreign_loan_id,
             from_chain_id,
             the_clock,
-            coin_out_value,
+            coin_out_value_9d,
             receiver,
             ctx
         );
@@ -534,7 +483,7 @@ module orbital::orbital {
         foreign_loan_id: vector<u8>,
         from_chain_id: u16,
         the_clock: &Clock,
-        coin_out_value: u64,
+        coin_out_value_9d: u64,
         receiver: address,
         ctx: &mut TxContext
     ) : bool {
@@ -542,20 +491,22 @@ module orbital::orbital {
         let coin_out_id = get_coin_id<Y>();
         let pool = bag::borrow_mut<String, Pool<Y>>(&mut state.pools, coin_out_id);
 
-        let coin_out = coin::take<Y>(&mut pool.balance, coin_out_value, ctx);
+        let coin_out = coin::take<Y>(&mut pool.balance, coin_out_value_9d, ctx);
 
         // Transfer coins to receiver.
         transfer::public_transfer(coin_out, receiver);
         
         let timestamp = clock::timestamp_ms(the_clock) / 1000;
 
+        let loan_id = object::new(ctx);
+
         // Save loan object to sender.
         transfer::share_object(
             ForeignLoan<Y> {
-                id: object::new(ctx), // Can't use foreign_loan_id as UID
+                id: loan_id, // Can't use foreign_loan_id as UID
                 foreign_loan_id: foreign_loan_id,
                 receiver: receiver,
-                coin_out_value: coin_out_value,
+                coin_out_value: coin_out_value_9d,
                 state: LoanStateACTIVE,
                 start_secs: timestamp,
                 interest_rate: pool.interest_rate,

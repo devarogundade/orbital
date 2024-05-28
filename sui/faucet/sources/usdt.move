@@ -1,3 +1,4 @@
+#[allow(unused_let_mut,duplicate_alias,unused_use)]
 module faucet::usdt {
     use std::option;
     use sui::coin::{Self, Coin, TreasuryCap};
@@ -12,20 +13,19 @@ module faucet::usdt {
     /// Module initializer is called once on module publish. A treasury
     /// cap is sent to the publisher, who then controls minting and burning
     fun init(witness: USDT, ctx: &mut TxContext) {
-        let (treasury, metadata) = coin::create_currency(witness, 18, b"USDT", b"Tether USD", b"", option::none(), ctx);
+        let (treasury, metadata) = coin::create_currency(witness, 9, b"USDT", b"Tether USD", b"", option::none(), ctx);
 
         transfer::public_freeze_object(metadata);
 
         transfer::public_transfer(treasury, tx_context::sender(ctx))
     }
 
-    public fun mint(
+    // Testing
+    public entry fun init_supply(
         treasury_cap: &mut TreasuryCap<USDT>, 
-        amount: u64, 
-        recipient: address, 
         ctx: &mut TxContext,
     ) {
-        let coin = coin::mint(treasury_cap, amount, ctx);
-        transfer::public_transfer(coin, recipient)
+        let coin = coin::mint(treasury_cap, 1_000_000_000_000_000_000, ctx);
+        transfer::public_transfer(coin, tx_context::sender(ctx))
     }
 }

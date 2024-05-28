@@ -3,7 +3,7 @@ import { Swiper, SwiperSlide } from 'swiper/vue';
 import type { Swiper as SwiperType } from 'swiper/types';
 import 'swiper/css';
 
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 const swiper = ref<SwiperType | null>(null);
 
@@ -20,20 +20,18 @@ const getSwiper = (swiperInstance: SwiperType) => {
           <SwiperSlide>
             <div class="announcement">
               <div class="announcement_gradient"></div>
-              <img class="annoucement_bg"
-                src="https://images.aeonmedia.co/images/8c5cde6d-bd81-4c6c-90fe-3b0da8b2cde4/creating-a-wormhole-in-a-quantum-computer-landscape-1.jpg?width=3840&quality=75&format=auto" />
+              <img class="annoucement_bg" src="/images/space.webp" />
               <div class="announcement_content">
                 <h3>Unlock the universe of decentralized finance with Orbital: Your gateway to limitless cross-chain
                   lending.</h3>
-                <p>Built with Wormhole X Supra.</p>
+                <p>Built with Wormhole X Supra Oracles.</p>
               </div>
             </div>
           </SwiperSlide>
 
           <SwiperSlide>
             <div class="announcement">
-              <img class="annoucement_bg"
-                src="https://assets-global.website-files.com/6425f546844727ce5fb9e5ab/65ddde15a859b34c7181a542_wave.webp" />
+              <img class="annoucement_bg" src="/images/sui-overflow.webp" />
               <div class="announcement_content">
                 <h3>Sui Overflow: <br> Sui’s first global virtual hackathon.</h3>
                 <p>Orbital is participating.</p>
@@ -43,8 +41,8 @@ const getSwiper = (swiperInstance: SwiperType) => {
         </Swiper>
 
         <div class="announcement_nav">
-          <button @click="swiper?.slidePrev()">ann.prev()</button>
-          <button @click="swiper?.slideNext()">ann.next()</button>
+          <button @click="swiper?.slidePrev()">Prev</button>
+          <button @click="swiper?.slideNext()">Next</button>
         </div>
       </div>
     </section>
@@ -57,23 +55,23 @@ const getSwiper = (swiperInstance: SwiperType) => {
               <h3>Borrow</h3>
               <p>Bridge your assets seamlessly with our cross-chain lending protocol on Sui: Where liquidity meets
                 opportunity.</p>
-              <RouterLink to="/borrow"><button>borrow.start()</button></RouterLink>
+              <RouterLink to="/borrow"><button>$ cd ../borrow</button></RouterLink>
             </div>
 
             <div class="borrow_image">
-              <img src="https://cdn.pixabay.com/photo/2023/09/04/17/04/mars-8233226_640.png" alt="">
+              <img src="/images/borrow.webp" alt="">
             </div>
           </div>
 
           <div class="lend">
             <div class="lend_image">
-              <img src="https://suifrens.com/images/accessorize-bullshark-cowboy.svg" alt="">
+              <img src="/images/flash_loan.webp" alt="">
             </div>
 
             <div class="lend_text">
-              <h3>Boost yout LTV</h3>
+              <h3>Flash loan</h3>
               <p>Stake your SUIFRENS NFT to increase your Loan-To-Value ratio above 80%.</p>
-              <RouterLink to="/amplifier"><button>amplifier.start()</button></RouterLink>
+              <RouterLink to="/flash-loan"><button>$ cd ../flash_loans</button></RouterLink>
             </div>
           </div>
         </div>
@@ -135,7 +133,7 @@ section {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  height: 400px;
+  height: 450px;
 }
 
 .announcement_content h3 {
@@ -170,7 +168,7 @@ section {
 .borrow_text h3 {
   font-size: 40px;
   font-weight: 500;
-  color: #a66118;
+  color: #db8f0c;
 }
 
 .borrow_text p {

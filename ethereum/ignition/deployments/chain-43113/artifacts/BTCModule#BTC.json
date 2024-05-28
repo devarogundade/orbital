@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "BTC",
-  "sourceName": "contracts/faucet/BTC.sol",
+  "contractName": "FUD",
+  "sourceName": "contracts/faucet/FUD.sol",
   "abi": [
     {
       "inputs": [],

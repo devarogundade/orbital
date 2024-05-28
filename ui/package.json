@@ -12,15 +12,18 @@
   },
   "dependencies": {
     "@mysten/sui.js": "^0.54.1",
-    "@web3modal/wagmi": "^4.2.1",
+    "@wagmi/connectors": "^4.1.12",
+    "@wagmi/core": "^2.6.3",
+    "@web3modal/wagmi": "^4.0.0",
+    "axios": "^1.7.2",
     "bignumber.js": "^4.0.2",
+    "firebase": "^10.12.1",
     "swiper": "^11.1.1",
     "viem": "^2.10.3",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
     "vue-sui": "^0.0.52",
     "vuex": "^4.1.0",
-    "wagmi": "^2.8.6",
     "web3": "^1.10.2"
   },
   "devDependencies": {

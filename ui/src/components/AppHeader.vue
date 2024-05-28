@@ -3,7 +3,7 @@
         <div class="app_width">
             <header>
                 <div class="logo">
-                    <img src="/images/logo.svg" alt="">
+                    <OrbitalIcon />
                 </div>
 
                 <div class="tabs">
@@ -13,8 +13,8 @@
                     <RouterLink to="/borrow">
                         <button :class="$route.name == 'borrow' ? 'tab active' : 'tab'">Borrow</button>
                     </RouterLink>
-                    <RouterLink to="/amplifier">
-                        <button :class="$route.name == 'amplifier' ? 'tab active' : 'tab'">Amplifier</button>
+                    <RouterLink to="/flash-loan">
+                        <button :class="$route.name == 'flash-loan' ? 'tab active' : 'tab'">Flash Loan</button>
                     </RouterLink>
                 </div>
 
@@ -23,25 +23,32 @@
                         <button class="connect">Launch App</button>
                     </RouterLink>
 
-                    <div v-else style="display: flex; gap: 16px; align-items: center;">
-                        <button v-if="!store.state.suiAddress" class="connect" @click="sui.onClick()">
-                            Connect to SUI
+                    <div v-else>
+                        <button v-if="!requesting.valueOf()" @click="requesting = !requesting" class="connect">
+                            Connect Wallet
                         </button>
 
-                        <button v-else class="connect">
-                            {{ Converter.fineHash(store.state.suiAddress, 5) }}
-                        </button>
+                        <div v-else style="display: flex; gap: 16px; align-items: center;">
+                            <button v-if="!store.state.suiAddress" class="connect" @click="sui.onClick()">
+                                Connect to SUI
+                            </button>
 
-                        <button v-if="!store.state.ethAddress" class="connect" @click="modal.open()">
-                            Connect to Polygon
-                        </button>
+                            <button v-else class="connect">
+                                {{ Converter.fineHash(store.state.suiAddress, 5) }}
+                            </button>
 
-                        <button v-else class="connect">
-                            {{ Converter.fineHash(store.state.ethAddress, 5) }}
-                        </button>
+                            <button v-if="!store.state.ethAddress" class="connect" @click="modal.open()">
+                                Connect to Avalanche
+                            </button>
 
-                        <RouterLink v-if="store.state.ethAddress && store.state.suiAddress" class="faucet" to="/faucet">
-                            ⛽</RouterLink>
+                            <button v-else class="connect">
+                                {{ Converter.fineHash(store.state.ethAddress, 5) }}
+                            </button>
+
+                            <RouterLink v-if="store.state.ethAddress && store.state.suiAddress" class="faucet"
+                                to="/faucet">
+                                ⛽</RouterLink>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -63,8 +70,10 @@ import { config, projectId, chains } from '../scripts/config';
 import { useStore } from 'vuex';
 import { key } from '../store';
 import { onMounted, ref } from 'vue';
+import OrbitalIcon from './icons/OrbitalIcon.vue';
 
 const sui = ref<SignInWithSui | null>(null);
+const requesting = ref(false);
 
 const store = useStore(key);
 
@@ -114,9 +123,13 @@ header {
     align-items: center;
 }
 
+.logo svg {
+    width: 150px;
+}
+
 .logo,
 .action {
-    min-width: 380px;
+    min-width: 390px;
 }
 
 .tabs {

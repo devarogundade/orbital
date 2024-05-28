@@ -17,12 +17,12 @@ export const chains = [
 
 export const tokens = [
     {
-        name: 'Bitcoin',
-        image: '/images/btc.png',
-        symbol: 'BTC',
+        name: 'Fud the Pug',
+        image: '/images/fud.png',
+        symbol: 'FUD',
         addresses: {
-            6: '0xB01c55634AB82268d0C0F915598858dEBD40d5C5',
-            21: '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::btc::BTC'
+            6: '0x70527a5098443849069603C26815705436500565',
+            21: '0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636::fud::FUD'
         }
     },
     {
@@ -30,8 +30,8 @@ export const tokens = [
         image: '/images/usdt.png',
         symbol: 'USDT',
         addresses: {
-            6: '0x49321b62D46A72d9F0D0275f1CDBED2CB7753306',
-            21: '0xf3c0743c760b0288112d1d68dddef36300c7351bad3b9c908078c01f02482f33::usdt::USDT'
+            6: '0xd08080A98d57239Ea7379861Fc1fdDAb190ba287',
+            21: '0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636::usdt::USDT'
         }
     }
 ];

@@ -238,6 +238,11 @@ export const abi = [
             },
             {
                 "internalType": "bytes32",
+                "name": "tokenIn",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bytes32",
                 "name": "tokenOut",
                 "type": "bytes32"
             },

@@ -43,9 +43,6 @@ contract Orbital is IOrbital, Ownable2Step {
     /// @notice Keeps tracks of foreign loans.
     mapping(bytes32 => ForeignLoan) private _foreignLoans;
 
-    /// @notice Keeps tracks of staked sui frends nft.
-    mapping(bytes32 => bool) private _hasStakedFrens;
-
     /// @dev interest rate is in basis points (0.01%)
     /// @notice Keeps tracks of tokens and their interest rate.
     mapping(bytes32 => uint256) private _interestRates;
@@ -111,13 +108,7 @@ contract Orbital is IOrbital, Ownable2Step {
         );
 
         /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
-        uint8 bonusLtv = 0;
-
-        if (_hasStakedFrens[sender.addressToBytes32()]) {
-            bonusLtv += 10; // 10 percent
-        }
-
-        (uint256 loan, ) = _splitAmount(amountOut, LTV + bonusLtv);
+        (uint256 loan, ) = _splitAmount(amountOut, LTV);
 
         /// @notice Get wormhole messgase fee.
         uint256 wormholeFee = _wormhole.messageFee();
@@ -235,6 +226,9 @@ contract Orbital is IOrbital, Ownable2Step {
             CONSISTENCY_LEVEL
         );
 
+        /// @notice Update nonce tracker.
+        _wormholeNonce++;
+
         loan.state = LoanState.SETTLED;
 
         return true;
@@ -247,6 +241,7 @@ contract Orbital is IOrbital, Ownable2Step {
         bytes32 receiver,
         uint16 fromChainId,
         bytes32 fromContractId,
+        bytes32 tokenIn,
         bytes32 tokenOut,
         uint256 value
     ) external override onlyOwner {
@@ -258,6 +253,7 @@ contract Orbital is IOrbital, Ownable2Step {
             receiver,
             fromChainId,
             fromContractId,
+            tokenIn,
             tokenOut,
             value
         );
@@ -280,28 +276,15 @@ contract Orbital is IOrbital, Ownable2Step {
         _executeds[wormholeNonce] = result;
     }
 
-    function receiveOnStakeSuiFrens(
-        uint32 wormholeNonce,
-        bytes32 receiver,
-        bool status
-    ) external override onlyOwner {
-        /// @notice Check if nonce was executed.
-        require(!_executeds[wormholeNonce], "Nonce was already executed.");
-
-        _hasStakedFrens[receiver] = status;
-
-        /// @notice Update nonce as executed.
-        _executeds[wormholeNonce] = true;
-    }
-
     /// @notice Thus function receives borrow events from foreign orbitals.
     function onBorrow(
         bytes32 foreignLoanId,
         bytes32 receiver,
         uint16 fromChainId,
         bytes32 fromContractId,
+        bytes32 tokenIn,
         bytes32 tokenOut,
-        uint256 value // Can be amount for erc20 or tokenId for erc721.
+        uint256 tokenInValue
     ) internal returns (bool) {
         /// @notice Check the foreign orbital is correct.
         require(
@@ -322,9 +305,21 @@ contract Orbital is IOrbital, Ownable2Step {
         /// @notice Convert token receiver address to evm address.
         address receiverAddress = receiver.bytes32ToAddress();
 
+        uint256 tokenInValue18d = tokenInValue * 1_000_000_000;
+
+        /// @notice Get input amount equivalent of output amount.
+        uint256 tokenOutValue = _priceFeeds.estimateFromTo(
+            tokenIn,
+            tokenOut,
+            tokenInValue18d
+        );
+
+        /// @notice Calculate amount out with LTV, i.e 80% of the actual value.
+        (uint256 loan, ) = _splitAmount(tokenOutValue, LTV);
+
         /// @notice Transfer tokens to receiver.
         IERC20 token = IERC20(tokenOutAddress);
-        token.transfer(receiverAddress, value);
+        token.transfer(receiverAddress, loan);
 
         /// @notice Look up for token interest rate.
         uint256 interestRate = _interestRates[tokenOut];
@@ -334,7 +329,7 @@ contract Orbital is IOrbital, Ownable2Step {
             foreignLoanId: foreignLoanId,
             receiver: receiver,
             tokenOut: tokenOut,
-            value: value,
+            value: loan,
             state: LoanState.ACTIVE,
             startSecs: block.timestamp,
             interestRate: interestRate,

@@ -24,6 +24,7 @@
     "@mysten/sui.js": "^0.52.0",
     "@wormhole-foundation/relayer-engine": "^0.3.2",
     "dotenv": "^16.4.5",
+    "firebase-admin": "^12.1.1",
     "web3": "^1.10.2"
   }
 }

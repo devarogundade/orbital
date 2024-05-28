@@ -3,11 +3,12 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 
 import { abi as ethAbi } from '../contracts/eth';
 import { config } from './config';
+import { getCoins } from './blockeden';
 
 export const defaultInterestRate = 10000000000;
 
-const ORBITAL_SUI = "0xd32d534df7c7f0e9ce67e682c70decdb67f8b17224c824f9722ab752a648b798";
-export const ORBITAL_AVAX = '0x5B580c65f9174aE942a38e722A8D92fbC89CF5eB';
+const ORBITAL_SUI = "0x0cb3ed8d5c81bf10b99844d63844e764fe689e507b2aa7edc0a28cfae3d1c878";
+export const ORBITAL_AVAX = '0x9d18ab7AA68Ffcd6192e775E26c2631c8F66334e';
 
 export function addressToBytes32(address: string): string {
     // Remove the '0x' prefix if present
@@ -103,10 +104,10 @@ export async function ethRepay(
 
 // SUI DEPS //
 
-const state: string = "0x95bc176fa20d51180d2cd84cab76d239f1ddac6e73ff175c9ae5362ac3307603";
+const state: string = "0x478d818bb6c5c7e12d0503a5511d4e3157dd867b274bf1159055c07ec04cc268";
 const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
 const oracleHolder: string = "0x87ef65b543ecb192e89d1e6afeaf38feeb13c3a20c20ce413b29a9cbfbebd570";
-const priceFeedsState: string = "0x69b0c16d85cfb83b232fde94828a274486b434d47ea1d813543f63633b52c72e";
+const priceFeedsState: string = "0x0baf46c8db4087ad9a170576b0f59c55cffcea8a847f8282ef0c13336d13890b";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 export async function suiBorrow(
@@ -119,13 +120,35 @@ export async function suiBorrow(
     adapter: any
 ) {
     try {
+        console.log('f');
+
         const txb = new TransactionBlock();
 
         const [coinGas] = txb.splitCoins(txb.gas, [
             txb.pure(0) // Wormhole fee.
         ]);
 
-        const [coinIn] = txb.splitCoins(txb.object("0xcb5f656966dcd738eb916fe88b31edeb8bd7ee7a879fd2f60aecb0e0c1441a2e"), [
+        const requestAllCoins = await getCoins(sender, coinInType);
+
+        // Check if coins objects are not empty.
+        if (!requestAllCoins || requestAllCoins.length == 0) {
+            return null;
+        }
+
+        // Get only coin object ids
+        const allCoinsObject = requestAllCoins.map((r: any) => r.coinObjectId);
+
+        // Pick the first coin object as destination coin
+        const destinationInCoin = allCoinsObject[0];
+
+        // If there are other destination coins left, merge them together
+        if (allCoinsObject.length > 1) {
+            const [, ...otherInCoins] = allCoinsObject;
+            txb.mergeCoins(destinationInCoin, otherInCoins);
+        }
+
+        // Take only the amount user specified out of the merges coins;
+        const [coinIn] = txb.splitCoins(destinationInCoin, [
             txb.pure.u64(coinInValue)
         ]);
 
@@ -163,6 +186,7 @@ export async function suiBorrow(
 
 export async function suiRepay(
     loan: string,
+    sender: string,
     coinOutValue: string,
     coinOutType: string,
     adapter: any
@@ -174,7 +198,27 @@ export async function suiRepay(
             txb.pure(0) // Wormhole fee.
         ]);
 
-        const [coinOut] = txb.splitCoins(txb.gas, [
+        const requestAllCoins = await getCoins(sender, coinOutType);
+
+        // Check if coins objects are not empty.
+        if (!requestAllCoins || requestAllCoins.length == 0) {
+            return null;
+        }
+
+        // Get only coin object ids
+        const allCoinsObject = requestAllCoins.map((r: any) => r.coinObjectId);
+
+        // Pick the first coin object as destination coin
+        const destinationInCoin = allCoinsObject[0];
+
+        // If there are other destination coins left, merge them together
+        if (allCoinsObject.length > 1) {
+            const [, ...otherInCoins] = allCoinsObject;
+            txb.mergeCoins(destinationInCoin, otherInCoins);
+        }
+
+        // Take only the amount user specified out of the merges coins;
+        const [coinOut] = txb.splitCoins(destinationInCoin, [
             txb.pure.u64(coinOutValue)
         ]);
 

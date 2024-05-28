@@ -1,14 +1,25 @@
+export enum LoanState {
+    NONE,
+    ACTIVE,
+    SETTLED,
+    DEFAULTED
+}
+
 export type Loan = {
-    amountIn: number | undefined;
-    amountOut: number | undefined;
+    loanId: string | null;
+    amountIn: number | null;
+    amountOut: number | null;
     tokenType: number;
     fromChainId: number;
     toChainId: number;
     collateral: string;
     principal: string;
     interchange: boolean;
-    interestRate: number | undefined;
-    startSecs: number | undefined;
+    interestRate: number | null;
+    startSecs: number | null;
+    sender: string | null;
+    fromHash: string | null;
+    state: LoanState;
 };
 
 export interface Message {

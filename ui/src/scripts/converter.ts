@@ -5,7 +5,6 @@ const Converter = {
         if (hash == null || hash.length == 0) return '- - - - -';
         return hash.substring(0, space) + '...' + hash.substring(hash.length - space, hash.length);
     },
-
     fromWei: function (wei: any) {
         try {
             if (wei == '' || wei == '0') return '0';
@@ -15,7 +14,16 @@ const Converter = {
             return '0';
         }
     },
-    toWei: function (ether: string) {
+    fromGwei: function (wei: any) {
+        try {
+            if (wei == '' || wei == '0') return '0';
+            return convert(wei, 'gwei', 'ether');
+        } catch (error) {
+            console.error('ether', error);
+            return '0';
+        }
+    },
+    toWei: function (ether: any) {
         try {
             if (ether == '') return '0';
             return convert(ether, 'ether', 'wei');
@@ -24,7 +32,16 @@ const Converter = {
             return '0';
         }
     },
-    toMoney: function (amount: any, noComma = false, max = null) {
+    toGwei: function (ether: any) {
+        try {
+            if (ether == '') return '0';
+            return convert(ether, 'ether', 'gwei');
+        } catch (error) {
+            console.error('wei', error);
+            return '0';
+        }
+    },
+    toMoney: function (amount: any, noComma = false, max: number | null = null) {
         let maxF = max ? max : 6;
         if (amount > 1) {
             maxF = 3;

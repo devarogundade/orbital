@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 import { chain, token } from '@/scripts/chains';
 import { addressToBytes32, defaultInterestRate, ethBorrow, ethRepay, getAmountOut, ORBITAL_AVAX, suiBorrow, suiRepay } from '@/scripts/loan';
 import Converter from '@/scripts/converter';
 // @ts-ignore
 import { useStore } from 'vuex';
 import { key } from '../store';
-import type { Loan } from '@/types';
-import { getAllLoans, saveNewLoan } from '@/scripts/storage';
+import { LoanState, type Loan } from '@/types';
+import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan } from '@/scripts/storage';
 import { approve, getAllowance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
+import { getCoinBalances } from "@/scripts/blockeden";
 
 const emit = defineEmits(['close']);
 
@@ -18,19 +19,25 @@ const store = useStore(key);
 const allowance = ref<String>('0');
 const approving = ref<boolean>(false);
 const borrowing = ref<boolean>(false);
-const repaying = ref<number | null>(null);
+const repaying = ref<string | null>(null);
+const ethBalances = ref({ usdt: '0', fud: '0' });
+const suiBalances = ref({ usdt: '0', fud: '0' });
 
 const loan = ref<Loan>({
-  amountIn: undefined,
-  amountOut: undefined,
+  loanId: null,
+  amountIn: null,
+  amountOut: null,
   tokenType: 0,
   fromChainId: 6,
   toChainId: 21,
   collateral: 'USDT',
-  principal: 'BTC',
+  principal: 'FUD',
   interchange: false,
-  interestRate: undefined, // will be injected later
-  startSecs: undefined // will be injected later
+  interestRate: null, // will be injected later
+  startSecs: null, // will be injected later
+  fromHash: null, // will be injected later
+  sender: null, // will be injected later
+  state: LoanState.NONE
 });
 
 const myLoans = ref<Loan[]>([]);
@@ -43,6 +50,35 @@ watch(
   },
   { deep: true, }
 );
+
+const updateLoans = async () => {
+  // update all loans.
+  if (store.state.suiAddress && store.state.ethAddress) {
+    myLoans.value = await getAllLoans(
+      store.state.suiAddress,
+      store.state.ethAddress
+    );
+  }
+};
+
+const updateBalances = async () => {
+  if (store.state.suiAddress) {
+    const balances = await getCoinBalances(store.state.suiAddress);
+
+    if (!balances) return;
+
+    const usdtBalance = balances.find((b: any) => b.coinType == token(loan.value.collateral)!.addresses[21]);
+    const fudBalance = balances.find((b: any) => b.coinType == token(loan.value.principal)!.addresses[21]);
+
+    if (usdtBalance) {
+      suiBalances.value.usdt = usdtBalance.totalBalance;
+    }
+
+    if (fudBalance) {
+      suiBalances.value.fud = fudBalance.totalBalance;
+    }
+  }
+};
 
 const updateAllowance = async () => {
   if (loan.value.fromChainId == 21) {
@@ -67,7 +103,7 @@ const updateAllowance = async () => {
 
 const updateAmountOut = async () => {
   if (!loan.value.amountIn) {
-    loan.value.amountOut = undefined;
+    loan.value.amountOut = null;
     return;
   }
 
@@ -114,12 +150,27 @@ const approveOrbital = async () => {
 };
 
 const calculateInterest = (
-  value: number,
-  startSecs: number,
-  interestRate: number
+  loan: Loan
 ): number => {
+  const duration = (Date.now() / 1000) - loan.startSecs!;
 
-  return 0;
+  const ONE_YEAR = 31_536_000;
+
+  let interest = (loan.amountOut! * loan.interestRate! * duration)
+    / (100 * ONE_YEAR * 24 * 60 * 60);
+
+  interest = loan.fromChainId == 6 ?
+    Number(Converter.toWei(interest.toString())) :
+    Number(Converter.toGwei(interest.toString()));
+
+  // extra for delay interaction effect
+  if (loan.fromChainId == 6) {
+    interest += 0.000_000_2 * loan.amountOut!;
+  } else {
+    interest += 0.0_000_2 * loan.amountOut!;
+  }
+
+  return interest;
 };
 
 const interchange = () => {
@@ -130,6 +181,9 @@ const interchange = () => {
   loan.value.interchange = !loan.value.interchange;
 
   toTemp = null;
+
+  // Refresh balances
+  updateBalances();
 };
 
 const borrow = async () => {
@@ -176,16 +230,25 @@ const borrow = async () => {
         linkUrl: `https://testnet.snowtrace.io/tx/${hash}`
       });
 
+      loan.value.fromHash = hash;
+      loan.value.sender = store.state.ethAddress;
       loan.value.interestRate = defaultInterestRate;
       loan.value.startSecs = Number(Number(Date.now() / 1000).toFixed(0));
+      loan.value.state = LoanState.ACTIVE;
 
       // save a new loan.
-      saveNewLoan(loan.value);
+      await saveNewLoan(loan.value);
 
-      loan.value.amountIn = undefined;
+      setTimeout(() => {
+        // Refresh balances with bridging delay
+        updateBalances();
+        updateLoans();
+      }, 10_000);
+
+      loan.value.amountIn = null;
 
       // update all loans.
-      myLoans.value = getAllLoans();
+      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -201,11 +264,20 @@ const borrow = async () => {
 
   // Check for SUI
   if (loan.value.fromChainId == 21) {
+    if (loan.value.amountIn > Number(Converter.fromGwei(suiBalances.value.usdt))) {
+      notify.push({
+        title: 'Insufficient amount.',
+        description: 'Your balance is ' + Converter.toMoney(Converter.fromGwei(suiBalances.value.usdt)) + ' USDT',
+        category: 'error'
+      });
+      return;
+    }
+
     borrowing.value = true;
 
-    const tx = await suiBorrow(
+    const hash = await suiBorrow(
       loan.value.toChainId,
-      Converter.toWei(loan.value.amountIn!.toString()),
+      Converter.toGwei(loan.value.amountIn!.toString()),
       token(loan.value.collateral)!.addresses[21],
       token(loan.value.principal)!.addresses[21],
       store.state.suiAddress,
@@ -213,12 +285,34 @@ const borrow = async () => {
       store.state.suiAdapter
     );
 
-    if (tx) {
+    if (hash) {
+      notify.push({
+        title: 'Transaction successful.',
+        description: 'Transaction was sent.',
+        category: 'success',
+        linkTitle: 'View Trx',
+        linkUrl: `https://suiscan.xyz/testnet/tx/${hash}`
+      });
 
+      loan.value.fromHash = hash;
+      loan.value.sender = store.state.suiAddress;
       loan.value.interestRate = defaultInterestRate;
       loan.value.startSecs = Number(Number(Date.now() / 1000).toFixed(0));
+      loan.value.state = LoanState.ACTIVE;
 
-      saveNewLoan(loan.value);
+      // save a new loan.
+      await saveNewLoan(loan.value);
+
+      setTimeout(() => {
+        // Refresh balances with bridging delay
+        updateBalances();
+        updateLoans();
+      }, 10_000);
+
+      loan.value.amountIn = null;
+
+      // update all loans.
+      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -233,8 +327,24 @@ const borrow = async () => {
   }
 };
 
-const repay = async (loan: any, index: number) => {
+const repay = async (loan: Loan) => {
   if (!store.state.ethAddress || !store.state.suiAddress) {
+    notify.push({
+      title: 'Connect your wallets first!',
+      description: 'Then try again.',
+      category: 'error'
+    });
+    return;
+  }
+
+  if (!loan.loanId) {
+    notify.push({
+      title: 'Loading your loans!',
+      description: 'Please wait and try again.',
+      category: 'error'
+    });
+
+    updateLoans();
 
     return;
   }
@@ -243,16 +353,45 @@ const repay = async (loan: any, index: number) => {
     return;
   }
 
-  // Check for Avalanche. @reversed
-  if (loan.fromChainId == 21) {
-    repaying.value == index;
+  // Check for Avalanche.
+  if (loan.fromChainId! == 21) {
+    repaying.value == loan.loanId;
 
-    const tx = await ethRepay(loan.loanId);
+    const interest = Converter.fromWei(calculateInterest(loan));
+    const coinOutValue = Converter.toWei(loan.amountOut! + (Number(interest) * 1.2));
 
-    if (tx) {
+    await approve(
+      token(loan.principal)!.addresses[6] as `0x${string}`,
+      ORBITAL_AVAX,
+      coinOutValue
+    );
 
+    const hash = await ethRepay(loan.loanId);
+
+    if (hash) {
+      notify.push({
+        title: 'Transaction successful.',
+        description: 'Transaction was sent.',
+        category: 'success',
+        linkTitle: 'View Trx',
+        linkUrl: `https://testnet.snowtrace.io/tx/${hash}`
+      });
+
+      await setLoanAsSettled(loan.fromHash!);
+
+      setTimeout(() => {
+        // Refresh balances with bridging delay
+        updateBalances();
+        updateLoans();
+      }, 10_000);
+
+      updateLoans();
     } else {
-
+      notify.push({
+        title: 'Failed to send transaction.',
+        description: 'Try again.',
+        category: 'error'
+      });
     }
 
     repaying.value == null;
@@ -260,30 +399,94 @@ const repay = async (loan: any, index: number) => {
 
   // Check for SUI. @reversed
   if (loan.fromChainId == 6) {
-    repaying.value == index;
+    repaying.value == loan.loanId;
 
-    // Calcalute estimated interest plus principal.
-    const coinOutValue = "1000";
+    const interest = Number(Converter.fromWei(calculateInterest(loan)));
+    const coinOutValue = Number(Converter.toGwei(loan.amountOut! + interest)).toFixed(0);
 
-    const tx = await suiRepay(
+    const hash = await suiRepay(
       loan.loanId,
-      Converter.toWei(coinOutValue),
-      token(loan.value.principal)!.addresses[21],
+      store.state.suiAddress,
+      coinOutValue,
+      token(loan.principal)!.addresses[21],
       store.state.suiAdapter
     );
 
-    if (tx) {
+    if (hash) {
+      notify.push({
+        title: 'Transaction successful.',
+        description: 'Transaction was sent.',
+        category: 'success',
+        linkTitle: 'View Trx',
+        linkUrl: `https://testnet.snowtrace.io/tx/${hash}`
+      });
 
+      await setLoanAsSettled(loan.fromHash!);
+
+      setTimeout(() => {
+        // Refresh balances with bridging delay
+        updateBalances();
+        updateLoans();
+      }, 10_000);
+
+      updateLoans();
     } else {
-
+      notify.push({
+        title: 'Failed to send transaction.',
+        description: 'Try again.',
+        category: 'error'
+      });
     }
 
     repaying.value == null;
   }
 };
 
+const deleteLoan = async (loan: Loan) => {
+  const deleted = await removeLoan(loan.fromHash!);
+
+  if (deleted) {
+    notify.push({
+      title: 'Loan has been deleted.',
+      description: 'Deleted loans cannot be recorved!.',
+      category: 'error'
+    });
+
+    // update all loans.
+    updateLoans();
+  } else {
+    notify.push({
+      title: 'Failed to delete loan.',
+      description: 'Try again.',
+      category: 'error'
+    });
+  }
+};
+
+const suiAddressState = computed(() => store.state.suiAddress);
+const ethAddressState = computed(() => store.state.ethAddress);
+
+watch(suiAddressState, () => {
+  updateLoans();
+
+  // Refresh balances
+  updateBalances();
+});
+
+
+watch(ethAddressState, () => {
+  updateLoans();
+
+  // Refresh balances
+  updateBalances();
+});
+
+
 onMounted(() => {
-  myLoans.value = getAllLoans();
+  updateLoans();
+
+  // Refresh balances
+  updateBalances();
 });
 </script>
 
@@ -311,7 +514,15 @@ onMounted(() => {
               </div>
 
               <div class="input_token">
-                <p>Enter amount:</p>
+                <div class="labels">
+                  <p>Enter amount:</p>
+                  <p v-if="loan.fromChainId == 6">
+                    Bal: {{ Converter.toMoney(Converter.fromWei(ethBalances.usdt)) }}
+                  </p>
+                  <p v-else>
+                    Bal: {{ Converter.toMoney(Converter.fromGwei(suiBalances.usdt)) }}
+                  </p>
+                </div>
                 <div class="input">
                   <input min="0" v-model="loan.amountIn" type="number" placeholder="0.00" />
                   <div class="token">
@@ -348,7 +559,15 @@ onMounted(() => {
               </div>
 
               <div class="input_token">
-                <p>Est. Principal:</p>
+                <div class="labels">
+                  <p>Est. Principal:</p>
+                  <p v-if="loan.fromChainId == 21">
+                    Bal: {{ Converter.toMoney(Converter.fromWei(ethBalances.fud)) }}
+                  </p>
+                  <p v-else>
+                    Bal: {{ Converter.toMoney(Converter.fromGwei(suiBalances.fud)) }}
+                  </p>
+                </div>
                 <div class="input">
                   <input type="number" :value="loan.amountOut" disabled placeholder="0.00" />
                   <div class="token">
@@ -381,60 +600,156 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="table_container">
-          <h3>My loans</h3>
-          <div class="open_loans">
-            <table>
-              <thead>
-                <tr>
-                  <td>#</td>
-                  <td>Collateral</td>
-                  <td>Principal</td>
-                  <td>Action</td>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="loan, index in myLoans" :key="index">
-                  <td>{{ index + 1 }}</td>
-                  <td>
-                    <div class="table_collateral">
-                      <div class="token">
-                        <img :src="token(loan.collateral)!.image" alt="">
-                        <p>
-                          {{ Converter.toMoney(loan.amountIn!.toString()) }}
-                          {{ token(loan.collateral)!.symbol }}
-                        </p>
+        <div style="display: flex; flex-direction: column; gap: 40px;">
+          <div class="table_container">
+            <h3>Open Loans ({{ myLoans.filter(ml => ml.state != LoanState.SETTLED).length }})</h3>
+            <div class="open_loans">
+              <table>
+                <thead>
+                  <tr>
+                    <td>#</td>
+                    <td>Collateral</td>
+                    <td>Principal</td>
+                    <td>Interest</td>
+                    <td></td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="loan, index in myLoans.filter(ml => ml.state != LoanState.SETTLED)" :key="index">
+                    <td>{{ index + 1 }}</td>
+                    <td>
+                      <div class="table_collateral">
+                        <div class="token">
+                          <img :src="token(loan.collateral)!.image" alt="">
+                          <p>
+                            {{ Converter.toMoney(loan.amountIn!.toString()) }}
+                            {{ token(loan.collateral)!.symbol }}
+                          </p>
+                        </div>
+                        <div class="chain">
+                          <img :src="chain(loan.fromChainId)!.image" alt="">
+                          <p>{{ chain(loan.fromChainId)!.name }}</p>
+                        </div>
                       </div>
-                      <div class="chain">
-                        <img src="/images/avax.png" alt="">
-                        <p>Polygon</p>
+                    </td>
+                    <td>
+                      <div class="table_principal">
+                        <div class="token">
+                          <img :src="token(loan.principal)!.image" alt="">
+                          <p>
+                            {{ Converter.toMoney(loan.amountOut!.toString()) }}
+                            {{ token(loan.principal)!.symbol }}
+                          </p>
+                        </div>
+                        <div class="chain">
+                          <img :src="chain(loan.toChainId)!.image" alt="">
+                          <p>{{ chain(loan.toChainId)!.name }}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="table_principal">
-                      <div class="token">
+                    </td>
+                    <td>
+                      <div class="token" v-if="loan.state == LoanState.ACTIVE">
                         <img :src="token(loan.principal)!.image" alt="">
-                        <p>
-                          <!-- calculate interest instead -->
-                          {{ Converter.toMoney(loan.amountOut!.toString()) }}
+                        <p v-if="loan.fromChainId == 6">
+                          {{ Converter.toMoney(Converter.fromWei(calculateInterest(loan)), false, 10) }}
+                          {{ token(loan.principal)!.symbol }}
+                        </p>
+                        <p v-else>
+                          {{ Converter.toMoney(Converter.fromGwei(calculateInterest(loan)), false, 10) }}
                           {{ token(loan.principal)!.symbol }}
                         </p>
                       </div>
-                      <div class="chain">
-                        <img src="/images/sui.png" alt="">
-                        <p>SUI</p>
+
+                      <div class="token" v-else>
+                        <img :src="token(loan.principal)!.image" alt="">
+                        <p>Interest paid</p>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <button @click="repay(loan, index)">
-                      {{ repaying?.valueOf() == index ? "Repaying.." : "Repay" }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    </td>
+                    <td v-if="loan.loanId && loan.state == LoanState.ACTIVE">
+                      <button @click="repay(loan)">
+                        {{ repaying?.valueOf() == loan.loanId ? "Repaying.." : "Repay" }}
+                      </button>
+                    </td>
+                    <td v-else>
+                      <button>Processing...</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table_container">
+            <h3>Closed Loans ({{ myLoans.filter(ml => ml.state == LoanState.SETTLED).length }})</h3>
+            <div class="open_loans">
+              <table>
+                <thead>
+                  <tr>
+                    <td>#</td>
+                    <td>Collateral</td>
+                    <td>Principal</td>
+                    <td>Interest</td>
+                    <td></td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="loan, index in myLoans.filter(ml => ml.state == LoanState.SETTLED)" :key="index">
+                    <td>{{ index + 1 }}</td>
+                    <td>
+                      <div class="table_collateral">
+                        <div class="token">
+                          <img :src="token(loan.collateral)!.image" alt="">
+                          <p>
+                            {{ Converter.toMoney(loan.amountIn!.toString()) }}
+                            {{ token(loan.collateral)!.symbol }}
+                          </p>
+                        </div>
+                        <div class="chain">
+                          <img :src="chain(loan.fromChainId)!.image" alt="">
+                          <p>{{ chain(loan.fromChainId)!.name }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="table_principal">
+                        <div class="token">
+                          <img :src="token(loan.principal)!.image" alt="">
+                          <p>
+                            {{ Converter.toMoney(loan.amountOut!.toString()) }}
+                            {{ token(loan.principal)!.symbol }}
+                          </p>
+                        </div>
+                        <div class="chain">
+                          <img :src="chain(loan.toChainId)!.image" alt="">
+                          <p>{{ chain(loan.toChainId)!.name }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="token" v-if="loan.state == LoanState.ACTIVE">
+                        <img :src="token(loan.principal)!.image" alt="">
+                        <p v-if="loan.fromChainId == 6">
+                          {{ Converter.toMoney(Converter.fromWei(calculateInterest(loan)), false, 10) }}
+                          {{ token(loan.principal)!.symbol }}
+                        </p>
+                        <p v-else>
+                          {{ Converter.toMoney(Converter.fromGwei(calculateInterest(loan)), false, 10) }}
+                          {{ token(loan.principal)!.symbol }}
+                        </p>
+                      </div>
+
+                      <div class="token" v-else>
+                        <img :src="token(loan.principal)!.image" alt="">
+                        <p>Interest paid</p>
+                      </div>
+                    </td>
+                    <td>
+                      <button style="background: #d20808;" @click="deleteLoan(loan)">Delete</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -558,10 +873,16 @@ section {
   padding: 10px 24px 30px 24px;
 }
 
-.input_token>p {
+.input_token .labels p {
   font-size: 14px;
   font-weight: 500;
   color: var(--tx-dimmed);
+}
+
+.labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .input {
@@ -678,15 +999,16 @@ input {
   color: var(--tx-normal);
 }
 
-/* .table_container {} */
+.table_container {
+  max-width: 100%;
+}
 
 .table_container>h3 {
   color: var(--tx-normal);
-  font-size: 24px;
+  font-size: 18px;
 }
 
 .open_loans {
-  width: 450px;
   border-radius: 16px;
   background: var(--background-lighter);
   margin-top: 16px;
@@ -694,6 +1016,27 @@ input {
 
 table {
   width: 100%;
+}
+
+table td:first-child {
+  width: 40px;
+}
+
+
+table td:nth-child(2) {
+  width: 180px;
+}
+
+table td:nth-child(3) {
+  width: 180px;
+}
+
+table td:nth-child(4) {
+  width: 160px;
+}
+
+table td:nth-child(5) {
+  width: 120px;
 }
 
 thead {

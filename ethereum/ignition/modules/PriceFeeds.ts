@@ -1,6 +1,6 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import "@nomicfoundation/hardhat-ignition-ethers";
-import BTCModule from "./BTC";
+import FUDModule from "./FUD";
 import USDTModule from "./USDT";
 
 const PriceFeedsModule = buildModule("PriceFeedsModule", (m) => {
@@ -17,10 +17,10 @@ const PriceFeedsModule = buildModule("PriceFeedsModule", (m) => {
     },
   });
 
-  const { btc } = m.useModule(BTCModule);
+  const { fud } = m.useModule(FUDModule);
   const { usdt } = m.useModule(USDTModule);
 
-  m.call(priceFeeds, "updateFeedId", [btc, 18], { id: "BTC", from: account });
+  m.call(priceFeeds, "updateFeedId", [fud, 18], { id: "FUD", from: account });
 
   m.call(priceFeeds, "updateFeedId", [usdt, 48], { id: "USDT", from: account });
 
