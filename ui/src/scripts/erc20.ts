@@ -1,6 +1,17 @@
 import { config } from './config';
-import { waitForTransactionReceipt, writeContract, readContract } from '@wagmi/core';
+import { waitForTransactionReceipt, writeContract, readContract, getBalance } from '@wagmi/core';
 import { abi as erc20Abi } from "../contracts/erc20";
+
+export async function getTokenBalance(tokenId: `0x${string}`, address: `0x${string}`) {
+    try {
+        const { value } = await getBalance(config, { token: tokenId, address });
+        return value;
+    } catch (error) {
+        console.log(error);
+
+        return BigInt(0);
+    }
+}
 
 export async function getAllowance(tokenId: `0x${string}`, address: `0x${string}`, spender: `0x${string}`) {
     try {

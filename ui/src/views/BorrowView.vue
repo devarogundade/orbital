@@ -8,7 +8,7 @@ import { useStore } from 'vuex';
 import { key } from '../store';
 import { LoanState, type Loan } from '@/types';
 import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan } from '@/scripts/storage';
-import { approve, getAllowance } from '@/scripts/erc20';
+import { approve, getAllowance, getTokenBalance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
 import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
@@ -22,7 +22,7 @@ const allowance = ref<String>('0');
 const approving = ref<boolean>(false);
 const borrowing = ref<boolean>(false);
 const repaying = ref<string | null>(null);
-const ethBalances = ref({ usdt: '0', fud: '0' });
+const ethBalances = ref({ usdt: BigInt(0), fud: BigInt(0) });
 const suiBalances = ref({ usdt: '0', fud: '0' });
 
 const fromChaining = ref(false);
@@ -84,6 +84,18 @@ const updateBalances = async () => {
     if (fudBalance) {
       suiBalances.value.fud = fudBalance.totalBalance;
     }
+  }
+
+  if (store.state.ethAddress) {
+    ethBalances.value.usdt = await getTokenBalance(
+      token(loan.value.collateral)!.addresses[6] as `0x${string}`,
+      store.state.ethAddress
+    );
+
+    ethBalances.value.fud = await getTokenBalance(
+      token(loan.value.principal)!.addresses[6] as `0x${string}`,
+      store.state.ethAddress
+    );
   }
 };
 
