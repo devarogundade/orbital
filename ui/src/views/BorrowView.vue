@@ -147,7 +147,7 @@ const approveOrbital = async () => {
 
   if (hash) {
     notify.push({
-      title: 'Transaction successful.',
+      title: 'Approval successful.',
       description: 'Transaction was sent.',
       category: 'success',
       linkTitle: 'View Trx',
