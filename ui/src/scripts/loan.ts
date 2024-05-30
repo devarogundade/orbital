@@ -5,10 +5,10 @@ import { abi as ethAbi } from '../contracts/eth';
 import { config } from './config';
 import { getCoins } from './blockeden';
 
-export const defaultInterestRate = 10000000000;
+export const defaultInterestRate = 45000;
 
-const ORBITAL_SUI = "0x40f61258fec8ffa4b2d9e0de00c32bd1feedf622185eff2d9fbed7b6c31023d4";
-export const ORBITAL_AVAX = '0xA2c51C566875836874308FAAa86e37Ac4c19e545';
+const ORBITAL_SUI = "0xabb45ed94ba7366b631bee1dce8ecb456508f66b66bf7135841d8d57d2026270";
+export const ORBITAL_AVAX = '0xDdA5368dA176762d1964B868101e6592fba25b15';
 
 export function addressToBytes32(address: string): string {
     // Remove the '0x' prefix if present
@@ -104,10 +104,10 @@ export async function ethRepay(
 
 // SUI DEPS //
 
-const state: string = "0x32fe472f37585e99d952cdff2bc377433a80d3d11fee33007dc060a0de97a7a2";
+const state: string = "0xfb27fa6eac7fa42133e8c414cd066175ffecff49d4343306a0db7a4b1ac61082";
 const wormholeState: string = "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790";
 const oracleHolder: string = "0x87ef65b543ecb192e89d1e6afeaf38feeb13c3a20c20ce413b29a9cbfbebd570";
-const priceFeedsState: string = "0x5f77150cd88b2b0049ecabfd5f5b512618072cf51d44b4e1a747873f91d683c5";
+const priceFeedsState: string = "0x4f8111b5a6f228409d7e811e6ab780f6fad1c10957ff158738e6978bb2ebabb0";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 export async function suiBorrow(

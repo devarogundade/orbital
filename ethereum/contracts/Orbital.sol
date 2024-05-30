@@ -74,8 +74,12 @@ contract Orbital is IOrbital, Ownable2Step {
         _orbitals[chainId] = orbital;
     }
 
-    function addSupportedToken(address token) external onlyOwner {
+    function addSupportedToken(
+        address token,
+        uint256 interestRate
+    ) external onlyOwner {
         _supportedTokens.push(token.addressToBytes32());
+        _interestRates[token.addressToBytes32()] = interestRate;
     }
 
     /// @notice

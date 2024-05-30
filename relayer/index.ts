@@ -40,9 +40,9 @@ const LOAN_COLLECTION = "loans";
 
 // Orbital contract addresses //
 
-const ORBITAL_SUI = "0x40f61258fec8ffa4b2d9e0de00c32bd1feedf622185eff2d9fbed7b6c31023d4";
-const ORBITAL_SUI_EMITTER = "0xb32be58c535a1a6d5c9a9f7cb833ccb75e52b311bbb95d34793fddef1e19fda1";
-const ORBITAL_AVAX = "0xA2c51C566875836874308FAAa86e37Ac4c19e545";
+const ORBITAL_SUI = "0xabb45ed94ba7366b631bee1dce8ecb456508f66b66bf7135841d8d57d2026270";
+const ORBITAL_SUI_EMITTER = "0xb872e9e85580f1b53e1bdb4f7abccb5c523a99f47cc8876106387971781f19a0";
+const ORBITAL_AVAX = "0xDdA5368dA176762d1964B868101e6592fba25b15";
 
 // Cross chain method identifiers //
 const ON_BORROW_METHOD =
@@ -114,14 +114,12 @@ const ON_REPAY_METHOD =
                 if (hexPayload.startsWith(removeTrailingZeros(ON_REPAY_METHOD))) {
                     const params = parseSuiOnRepayHex(hexPayload);
 
-                    console.log(params);
+                    const tx = await signOnRepayTransactionOnEth(
+                        vaa.nonce,
+                        params.loanId
+                    );
 
-                    // const tx = await signOnRepayTransactionOnEth(
-                    //     vaa.nonce,
-                    //     params.loanId
-                    // );
-
-                    // console.log('⚡Trx hash: ', tx);
+                    console.log('⚡Trx hash: ', tx);
 
                     return;
                 }
@@ -214,10 +212,10 @@ const ON_REPAY_METHOD =
 
 // SUI DEPS //
 
-const state: string = "0x32fe472f37585e99d952cdff2bc377433a80d3d11fee33007dc060a0de97a7a2";
-const ownerCap: string = "0xa8e8cd95629f79de0dac2bf5ed3e7ad977efbc0b56aff7ab543e8cfd119aa255";
+const state: string = "0xfb27fa6eac7fa42133e8c414cd066175ffecff49d4343306a0db7a4b1ac61082";
+const ownerCap: string = "0xdf170db1a8fa28aa9840f18e307778bb038f74f91f1d1b6ec82001cc8454b2af";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
-const faucet = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6";
+const faucet = "0xae28fd09dc8df11e5b3a1d3389723cd9469988944661e708f6ddf4fb2f1fd644";
 
 // SUI TRANSACTIONS //
 
@@ -462,11 +460,11 @@ function getDefaultSUICoinOutType(): string {
 }
 
 function getDefaultEthTokenIn(): string {
-    return addressToBytes32("0x5c3bA76382E26b9f3a2d22CB33cb44Ad4b144643");
+    return addressToBytes32("0x19Fa5d8485fE33ebcd41989CE76F20311a9E6F28");
 }
 
 function getDefaultEthTokenOut(): string {
-    return addressToBytes32("0x89063ACC735dEF9Ec9706f5d5a69D4ADf4213158");
+    return addressToBytes32("0x65203C47fD727AB55974Ded62F01c53F7aB98fE4");
 }
 
 function addressToBytes32(address: string): string {

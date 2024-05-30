@@ -13,11 +13,11 @@ export async function mintAll(suiAddress: string, ethAddress: string) {
     await mintEthFud(ethAddress);
 }
 
-const SUI_FAUCET = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6";
+const SUI_FAUCET = "0xae28fd09dc8df11e5b3a1d3389723cd9469988944661e708f6ddf4fb2f1fd644";
 
 async function mintSuiUsdt(address: string) {
     const rpcUrl = getFullnodeUrl('testnet');
-    const usdtFaucet = "0x8a3b7987a9086197248ff1decb598b72979925201de92d83bbddacf2940b0668";
+    const usdtFaucet = "0x14c67ee6b188901c82ed3fd33a6fd9045ba1b9c93229ac49348234f1aff6010d";
 
     const client = new SuiClient({ url: rpcUrl });
 
@@ -58,7 +58,7 @@ async function mintSuiUsdt(address: string) {
 
 async function mintSuiFud(address: string) {
     const rpcUrl = getFullnodeUrl('testnet');
-    const usdtFaucet = "0x7fc524959667a458eb1227ae612a9f0d4324488d6e68b6f47d077df210b997ac";
+    const fudFaucet = "0xff8f6cd586a67ed59f0f75cc177e2ff7071d2dd0d7d80f7c49c25eff11ae924d";
 
     const client = new SuiClient({ url: rpcUrl });
 
@@ -68,7 +68,7 @@ async function mintSuiFud(address: string) {
         txb.moveCall({
             target: `${SUI_FAUCET}::fud::mint`,
             arguments: [
-                txb.object(usdtFaucet),
+                txb.object(fudFaucet),
                 txb.pure.address(address)
             ],
             typeArguments: [

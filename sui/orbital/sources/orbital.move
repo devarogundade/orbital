@@ -557,14 +557,22 @@ module orbital::orbital {
         interest_rate: u64,
         the_clock: &Clock,
     ) : u64 {
-        let timestamp = clock::timestamp_ms(the_clock) / 1000;
+         let timestamp = clock::timestamp_ms(the_clock) / 1000;
 
         let duration: u64 = timestamp - start_secs;
 
-        let interest: u64 = (value * interest_rate * duration) /
-            (100 * ONE_YEAR * 24 * 60 * 60);
+        let interest: u256 = (
+            (value as u256) * 
+            (interest_rate as u256) * 
+            (duration as u256)
+        ) /
+            (
+                (100 as u256) * 
+                (ONE_YEAR as u256) * 
+                ((24 * 60 * 60) as u256)
+            );
         
-        interest
+        (interest as u64)
     }
 
     fun split_amount(value: u64, percentage: u8) : (u64, u64) {

@@ -65,7 +65,6 @@ export const removeLoan = async (fromHash: string) => {
     }
 };
 
-
 export const setLoanAsSettled = async (fromHash: string) => {
     try {
         // Add a new document in collection "loans"

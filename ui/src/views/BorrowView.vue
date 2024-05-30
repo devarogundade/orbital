@@ -30,7 +30,7 @@ const fromTokening = ref(false);
 const toChaining = ref(false);
 const toTokening = ref(false);
 
-const LTV = 100;
+const LTV = 80;
 
 const loan = ref<Loan>({
   loanId: null,
@@ -135,7 +135,7 @@ const updateAmountOut = async () => {
     LTV
   );
 
-  loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(8));
+  loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(2));
 };
 
 const approveOrbital = async () => {
@@ -171,26 +171,26 @@ const approveOrbital = async () => {
   updateAllowance();
 };
 
-const calculateInterest = (
-  loan: Loan
+const estimateInterest = (
+  loan: Loan, withDelayEffect: boolean
 ): number => {
-  const duration = (Date.now() / 1000) - loan.startSecs!;
+  let delaySecs = 0;
+
+  if (withDelayEffect) {
+    delaySecs += 10 * 60 * 60 * 1000; // extra seconds
+  }
+
+  const timestamp = Date.now() / 1000;
+  const duration = (timestamp + delaySecs) - loan.startSecs!;
 
   const ONE_YEAR = 31_536_000;
 
-  let interest = (loan.amountOut! * loan.interestRate! * duration)
+  let value = loan.fromChainId == 21 ?
+    Converter.toWei(loan.amountOut!) :
+    Converter.toGwei(loan.amountOut!);
+
+  let interest: number = (value * loan.interestRate! * duration)
     / (100 * ONE_YEAR * 24 * 60 * 60);
-
-  interest = loan.fromChainId == 6 ?
-    Number(Converter.toWei(interest.toString())) :
-    Number(Converter.toGwei(interest.toString()));
-
-  // extra for delay interaction effect
-  if (loan.fromChainId == 6) {
-    interest += 0.000_000_2 * loan.amountOut!;
-  } else {
-    interest += 0.0_000_2 * loan.amountOut!;
-  }
 
   return interest;
 };
@@ -377,16 +377,28 @@ const repay = async (loan: Loan) => {
 
   // Check for Avalanche.
   if (loan.fromChainId! == 21) {
-    repaying.value == loan.loanId;
+    repaying.value = loan.loanId;
 
-    const interest = Converter.fromWei(calculateInterest(loan));
-    const coinOutValue = Converter.toWei(loan.amountOut! + (Number(interest) * 1.2));
-
-    await approve(
-      token(loan.principal)!.addresses[6] as `0x${string}`,
-      ORBITAL_AVAX,
-      coinOutValue
+    const interest = estimateInterest(loan, true);
+    const coinOutValue = Number(
+      Number(Converter.toWei(loan.amountOut!)) + Number(interest)
     );
+
+    const allowance = Converter.fromWei(
+      await getAllowance(
+        token(loan.principal)!.addresses[6] as `0x${string}`,
+        store.state.ethAddress,
+        ORBITAL_AVAX
+      )
+    );
+
+    if (Number(allowance) < Number(Converter.fromWei(coinOutValue))) {
+      await approve(
+        token(loan.principal)!.addresses[6] as `0x${string}`,
+        ORBITAL_AVAX,
+        coinOutValue.toFixed(0)
+      );
+    }
 
     const hash = await ethRepay(loan.loanId);
 
@@ -416,20 +428,26 @@ const repay = async (loan: Loan) => {
       });
     }
 
-    repaying.value == null;
+    repaying.value = null;
   }
 
   // Check for SUI. @reversed
   if (loan.fromChainId == 6) {
-    repaying.value == loan.loanId;
+    repaying.value = loan.loanId;
 
-    const interest = Number(Converter.fromWei(calculateInterest(loan)));
-    const coinOutValue = Number(Converter.toGwei(loan.amountOut! + interest)).toFixed(0);
+    const interest = estimateInterest(loan, true);
+    console.log('interest', interest);
+
+    const coinOutValue = Number(
+      Number(Converter.toGwei(loan.amountOut!)) + Number(interest)
+    );
+
+    console.log('coinOutValue', coinOutValue);
 
     const hash = await suiRepay(
       loan.loanId,
       store.state.suiAddress,
-      coinOutValue,
+      coinOutValue.toFixed(0),
       token(loan.principal)!.addresses[21],
       store.state.suiAdapter
     );
@@ -460,7 +478,7 @@ const repay = async (loan: Loan) => {
       });
     }
 
-    repaying.value == null;
+    repaying.value = null;
   }
 };
 
@@ -676,7 +694,7 @@ onMounted(() => {
                         <div class="token">
                           <img :src="token(loan.collateral)!.image" alt="">
                           <p>
-                            {{ Converter.toMoney(loan.amountIn!.toString()) }}
+                            {{ Converter.toMoney(loan.amountIn!, false, 10) }}
                             {{ token(loan.collateral)!.symbol }}
                           </p>
                         </div>
@@ -691,7 +709,7 @@ onMounted(() => {
                         <div class="token">
                           <img :src="token(loan.principal)!.image" alt="">
                           <p>
-                            {{ Converter.toMoney(loan.amountOut!.toString()) }}
+                            {{ Converter.toMoney(loan.amountOut!, false, 10) }}
                             {{ token(loan.principal)!.symbol }}
                           </p>
                         </div>
@@ -702,26 +720,21 @@ onMounted(() => {
                       </div>
                     </td>
                     <td>
-                      <div class="token" v-if="loan.state == LoanState.ACTIVE">
+                      <div class="token">
                         <img :src="token(loan.principal)!.image" alt="">
-                        <p v-if="loan.fromChainId == 6">
-                          {{ Converter.toMoney(Converter.fromWei(calculateInterest(loan)), false, 10) }}
+                        <p v-if="loan.fromChainId == 21">
+                          {{ Converter.toMoney(Converter.fromWei(estimateInterest(loan, false)), false, 10) }}
                           {{ token(loan.principal)!.symbol }}
                         </p>
                         <p v-else>
-                          {{ Converter.toMoney(Converter.fromGwei(calculateInterest(loan)), false, 10) }}
+                          {{ Converter.toMoney(Converter.fromGwei(estimateInterest(loan, false)), false, 10) }}
                           {{ token(loan.principal)!.symbol }}
                         </p>
-                      </div>
-
-                      <div class="token" v-else>
-                        <img :src="token(loan.principal)!.image" alt="">
-                        <p>Interest paid</p>
                       </div>
                     </td>
                     <td v-if="loan.loanId && loan.state == LoanState.ACTIVE">
                       <button @click="repay(loan)">
-                        {{ repaying?.valueOf() == loan.loanId ? "Repaying.." : "Repay" }}
+                        {{ repaying?.valueOf() == loan.loanId ? "..." : "Repay" }}
                       </button>
                     </td>
                     <td v-else>
@@ -780,19 +793,7 @@ onMounted(() => {
                       </div>
                     </td>
                     <td>
-                      <div class="token" v-if="loan.state == LoanState.ACTIVE">
-                        <img :src="token(loan.principal)!.image" alt="">
-                        <p v-if="loan.fromChainId == 6">
-                          {{ Converter.toMoney(Converter.fromWei(calculateInterest(loan)), false, 10) }}
-                          {{ token(loan.principal)!.symbol }}
-                        </p>
-                        <p v-else>
-                          {{ Converter.toMoney(Converter.fromGwei(calculateInterest(loan)), false, 10) }}
-                          {{ token(loan.principal)!.symbol }}
-                        </p>
-                      </div>
-
-                      <div class="token" v-else>
+                      <div class="token">
                         <img :src="token(loan.principal)!.image" alt="">
                         <p>Interest paid</p>
                       </div>
@@ -1145,6 +1146,7 @@ td button {
   font-size: 16px;
   font-weight: 500;
   border: none;
+  color: var(--tx-normal);
 }
 
 .table_container .token {

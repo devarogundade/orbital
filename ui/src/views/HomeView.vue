@@ -78,6 +78,17 @@ const getSwiper = (swiperInstance: SwiperType) => {
         </div>
       </div>
     </section>
+
+    <section>
+      <div class="app_width">
+        <div class="birth_container">
+          <div class="birth">
+            <img src="/images/birth.png" alt="" srcset="">
+            <button>▶️ Watch Demo</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 </template>
 
@@ -242,5 +253,39 @@ section {
 .lend_image img {
   width: 400px;
   max-width: 100%;
+}
+
+.birth_container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  cursor: pointer;
+}
+
+.birth img {
+  width: 850px;
+  max-width: 100%;
+  border-radius: 16px;
+}
+
+.birth {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.birth button {
+  position: absolute;
+  z-index: 1;
+  height: 65px;
+  padding: 0 40px;
+  border-radius: 26px;
+  background: #d33a3a31;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--tx-normal);
+  backdrop-filter: blur(8px);
 }
 </style>

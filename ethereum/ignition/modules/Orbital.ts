@@ -24,14 +24,15 @@ const OrbitalModule = buildModule("OrbitalModule", (m) => {
   const { fud } = m.useModule(FUDModule);
   const { usdt } = m.useModule(USDTModule);
 
-  m.call(orbital, "addSupportedToken", [fud], { id: "FUD", from: account });
+  m.call(orbital, "addSupportedToken", [fud, 45000], { id: "FUD", from: account });
 
-  m.call(orbital, "addSupportedToken", [usdt], { id: "USDT", from: account });
+  m.call(orbital, "addSupportedToken", [usdt, 45000], { id: "USDT", from: account });
 
   const SUI_CHAIN_ID = 21;
-  const SUI_ORBITAL_ID = "0x40f61258fec8ffa4b2d9e0de00c32bd1feedf622185eff2d9fbed7b6c31023d4";
+  const SUI_ORBITAL_ID = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
   m.call(orbital, "addForeignOrbital", [SUI_CHAIN_ID, SUI_ORBITAL_ID], {
+    id: 'addForeignOrbital',
     from: account,
   });
 
