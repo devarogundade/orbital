@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+const endpoint = `https://api.blockeden.xyz/sui/testnet/${import.meta.env.VITE_BLOCK_EDEN_KEY}`;
+
 export async function getCoinBalances(address: string) {
     try {
-        const response = await axios.post(`https://rpc-testnet.suiscan.xyz:443`, {
+        const response = await axios.post(endpoint, {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "suix_getAllBalances",
@@ -19,7 +21,7 @@ export async function getCoinBalances(address: string) {
 
 export async function getCoins(address: string, coinType: string) {
     try {
-        const response = await axios.post(`https://rpc-testnet.suiscan.xyz:443`, {
+        const response = await axios.post(endpoint, {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "suix_getAllCoins",
