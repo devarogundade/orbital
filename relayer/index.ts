@@ -40,9 +40,9 @@ const LOAN_COLLECTION = "loans";
 
 // Orbital contract addresses //
 
-const ORBITAL_SUI = "0x0cb3ed8d5c81bf10b99844d63844e764fe689e507b2aa7edc0a28cfae3d1c878";
-const ORBITAL_SUI_EMITTER = "0x9a5fff274ff3061d4e06ee5ecd904a0c5233f94cf0eaf7b4e52a06315be1d0f1";
-const ORBITAL_AVAX = "0x9d18ab7AA68Ffcd6192e775E26c2631c8F66334e";
+const ORBITAL_SUI = "0x40f61258fec8ffa4b2d9e0de00c32bd1feedf622185eff2d9fbed7b6c31023d4";
+const ORBITAL_SUI_EMITTER = "0xb32be58c535a1a6d5c9a9f7cb833ccb75e52b311bbb95d34793fddef1e19fda1";
+const ORBITAL_AVAX = "0xA2c51C566875836874308FAAa86e37Ac4c19e545";
 
 // Cross chain method identifiers //
 const ON_BORROW_METHOD =
@@ -214,10 +214,10 @@ const ON_REPAY_METHOD =
 
 // SUI DEPS //
 
-const state: string = "0x478d818bb6c5c7e12d0503a5511d4e3157dd867b274bf1159055c07ec04cc268";
-const ownerCap: string = "0x2b8480267d3edf9e2c7441d593d81043139abbeaf81279f2b02fcbae5b159dcf";
+const state: string = "0x32fe472f37585e99d952cdff2bc377433a80d3d11fee33007dc060a0de97a7a2";
+const ownerCap: string = "0xa8e8cd95629f79de0dac2bf5ed3e7ad977efbc0b56aff7ab543e8cfd119aa255";
 const theClock: string = "0x0000000000000000000000000000000000000000000000000000000000000006";
-const faucet = "0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636";
+const faucet = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6";
 
 // SUI TRANSACTIONS //
 
@@ -462,11 +462,11 @@ function getDefaultSUICoinOutType(): string {
 }
 
 function getDefaultEthTokenIn(): string {
-    return addressToBytes32("0xd08080A98d57239Ea7379861Fc1fdDAb190ba287");
+    return addressToBytes32("0x5c3bA76382E26b9f3a2d22CB33cb44Ad4b144643");
 }
 
 function getDefaultEthTokenOut(): string {
-    return addressToBytes32("0x70527a5098443849069603C26815705436500565");
+    return addressToBytes32("0x89063ACC735dEF9Ec9706f5d5a69D4ADf4213158");
 }
 
 function addressToBytes32(address: string): string {

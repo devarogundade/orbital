@@ -2,7 +2,8 @@
     <section>
         <div class="app_width">
             <div class="faucet">
-                <button @click="requestFaucet">Request test tokens.</button>
+                <button @click="requestFaucet">
+                    {{ requesting?.valueOf() ? 'Requesting...' : 'Request test tokens.' }}</button>
             </div>
         </div>
     </section>
@@ -14,8 +15,11 @@ import { useStore } from 'vuex';
 import { key } from '../store';
 import { notify } from '@/reactives/notify';
 import { mintAll } from '@/scripts/faucet';
+import { ref } from 'vue';
 
 const store = useStore(key);
+
+const requesting = ref(false);
 
 const requestFaucet = async () => {
     if (!store.state.ethAddress || !store.state.suiAddress) {
@@ -27,7 +31,15 @@ const requestFaucet = async () => {
         return;
     }
 
+    if (requesting.value) {
+        return;
+    }
+
+    requesting.value = true;
+
     await mintAll(store.state.suiAddress, store.state.ethAddress);
+
+    requesting.value = false;
 
     notify.push({
         title: 'Minting successful.',

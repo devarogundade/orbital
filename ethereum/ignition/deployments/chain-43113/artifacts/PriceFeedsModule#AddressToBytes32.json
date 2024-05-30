@@ -1,0 +1,49 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "AddressToBytes32",
+  "sourceName": "contracts/libraries/AddressToBytes32.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_address",
+          "type": "address"
+        }
+      ],
+      "name": "addressToBytes32",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_bytes",
+          "type": "bytes32"
+        }
+      ],
+      "name": "bytes32ToAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346100195760d4908161001f823930815050f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c9081635ced058e14607157506382c947b714603457600080fd5b6020366003190112606e5760043573ffffffffffffffffffffffffffffffffffffffff8116809103606a57602090604051908152f35b5080fd5b80fd5b90506020366003190112606a5760209073ffffffffffffffffffffffffffffffffffffffff600435168152f3fea2646970667358221220df7900857bb6a0cc13ccacea32adf7d5c6290e7ae20043215c37a9af6582229364736f6c63430008180033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c9081635ced058e14607157506382c947b714603457600080fd5b6020366003190112606e5760043573ffffffffffffffffffffffffffffffffffffffff8116809103606a57602090604051908152f35b5080fd5b80fd5b90506020366003190112606a5760209073ffffffffffffffffffffffffffffffffffffffff600435168152f3fea2646970667358221220df7900857bb6a0cc13ccacea32adf7d5c6290e7ae20043215c37a9af6582229364736f6c63430008180033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

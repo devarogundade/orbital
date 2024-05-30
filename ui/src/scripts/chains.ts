@@ -21,8 +21,8 @@ export const tokens = [
         image: '/images/fud.png',
         symbol: 'FUD',
         addresses: {
-            6: '0x70527a5098443849069603C26815705436500565',
-            21: '0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636::fud::FUD'
+            6: '0x89063ACC735dEF9Ec9706f5d5a69D4ADf4213158',
+            21: '0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6::fud::FUD'
         }
     },
     {
@@ -30,8 +30,8 @@ export const tokens = [
         image: '/images/usdt.png',
         symbol: 'USDT',
         addresses: {
-            6: '0xd08080A98d57239Ea7379861Fc1fdDAb190ba287',
-            21: '0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636::usdt::USDT'
+            6: '0x5c3bA76382E26b9f3a2d22CB33cb44Ad4b144643',
+            21: '0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6::usdt::USDT'
         }
     }
 ];

@@ -1,7 +1,7 @@
 [package]
 name = "faucet"
 edition = "2024.beta"
-# published-at = "0x76ab030e93509eaeac54d7feb270c95af5f5b38c56584cbfedc747efaac63636"
+# published-at = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }

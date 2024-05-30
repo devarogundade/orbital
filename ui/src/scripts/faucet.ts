@@ -13,7 +13,7 @@ export async function mintAll(suiAddress: string, ethAddress: string) {
     await mintEthFud(ethAddress);
 }
 
-const SUI_FAUCET = "";
+const SUI_FAUCET = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0bbc25c6";
 
 async function mintSuiUsdt(address: string) {
     const rpcUrl = getFullnodeUrl('testnet');
