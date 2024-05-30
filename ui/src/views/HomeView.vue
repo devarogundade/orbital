@@ -82,10 +82,12 @@ const getSwiper = (swiperInstance: SwiperType) => {
     <section>
       <div class="app_width">
         <div class="birth_container">
-          <div class="birth">
-            <img src="/images/birth.png" alt="" srcset="">
-            <button>▶️ Watch Demo</button>
-          </div>
+          <a href="https://demo.myorbital.xyz" target="_blank" rel="noopener noreferrer">
+            <div class="birth">
+              <img src="/images/birth.png" alt="" srcset="">
+              <button>▶️ Watch Demo</button>
+            </div>
+          </a>
         </div>
       </div>
     </section>
@@ -127,7 +129,7 @@ section {
   background: var(--background-light);
   font-size: 16px;
   font-weight: 500;
-  color: var(--primary)
+  color: var(--primary);
 }
 
 .announcement_gradient {
@@ -266,7 +268,6 @@ section {
 .birth img {
   width: 850px;
   max-width: 100%;
-  border-radius: 16px;
 }
 
 .birth {
@@ -274,6 +275,13 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.birth:hover button {
+  transform: scale(1.1, 1.1);
 }
 
 .birth button {
@@ -281,11 +289,11 @@ section {
   z-index: 1;
   height: 65px;
   padding: 0 40px;
-  border-radius: 26px;
   background: #d33a3a31;
   font-size: 18px;
   font-weight: 500;
   color: var(--tx-normal);
+  border-radius: 20px;
   backdrop-filter: blur(8px);
 }
 </style>
