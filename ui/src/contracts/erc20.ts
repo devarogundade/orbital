@@ -183,7 +183,13 @@ export const abi = [
         "type": "function"
     },
     {
-        "inputs": [],
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
+            }
+        ],
         "name": "mint",
         "outputs": [],
         "stateMutability": "nonpayable",

@@ -17,7 +17,7 @@ const SUI_FAUCET = "0xe91ee9c76f381200725dff9ac4622dcc84d5453a8610ae92659591df0b
 
 async function mintSuiUsdt(address: string) {
     const rpcUrl = getFullnodeUrl('testnet');
-    const usdtFaucet = "";
+    const usdtFaucet = "0x8a3b7987a9086197248ff1decb598b72979925201de92d83bbddacf2940b0668";
 
     const client = new SuiClient({ url: rpcUrl });
 
@@ -58,7 +58,7 @@ async function mintSuiUsdt(address: string) {
 
 async function mintSuiFud(address: string) {
     const rpcUrl = getFullnodeUrl('testnet');
-    const usdtFaucet = "";
+    const usdtFaucet = "0x7fc524959667a458eb1227ae612a9f0d4324488d6e68b6f47d077df210b997ac";
 
     const client = new SuiClient({ url: rpcUrl });
 

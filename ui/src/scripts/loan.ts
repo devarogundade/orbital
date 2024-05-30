@@ -37,7 +37,7 @@ export async function getAmountOut(
     tokenIn: string,
     tokenOut: string,
     amountIn: string,
-    ltv: number = 80
+    ltv: number
 ) {
     try {
         return readContract(config, {

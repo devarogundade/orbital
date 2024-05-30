@@ -30,6 +30,8 @@ const fromTokening = ref(false);
 const toChaining = ref(false);
 const toTokening = ref(false);
 
+const LTV = 100;
+
 const loan = ref<Loan>({
   loanId: null,
   amountIn: null,
@@ -130,6 +132,7 @@ const updateAmountOut = async () => {
     addressToBytes32(token(loan.value.collateral)!.addresses[6]),
     addressToBytes32(token(loan.value.principal)!.addresses[6]),
     Converter.toWei(loan.value.amountIn!.toString()),
+    LTV
   );
 
   loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(8));
@@ -581,7 +584,7 @@ onMounted(() => {
                 <p>Loan-To-Vlalue:</p>
                 <div class="chain">
                   <!-- <img src="/images/sui.png" alt=""> -->
-                  <p>80%</p>
+                  <p>{{ LTV }}%</p>
                 </div>
               </div>
 

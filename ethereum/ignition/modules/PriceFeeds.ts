@@ -20,9 +20,9 @@ const PriceFeedsModule = buildModule("PriceFeedsModule", (m) => {
   const { fud } = m.useModule(FUDModule);
   const { usdt } = m.useModule(USDTModule);
 
-  m.call(priceFeeds, "updateFeedId", [fud, 324], { id: "FUD", from: account }); // FUD_USDC
+  m.call(priceFeeds, "updateFeedId", [fud, 200], { id: "FUD", from: account }); // FUD_SUI
 
-  m.call(priceFeeds, "updateFeedId", [usdt, 48], { id: "USDT", from: account }); // USDT_USD
+  m.call(priceFeeds, "updateFeedId", [usdt, 90], { id: "USDT", from: account }); // USDT_SUI
 
   return { priceFeeds };
 });
