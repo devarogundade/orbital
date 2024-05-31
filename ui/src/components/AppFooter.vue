@@ -16,7 +16,7 @@
                     <a target="_blank"
                         href="https://www.canva.com/design/DAGGblBNCjA/EmcgD9-GhLpwln53hwpkmw/view?utm_content=DAGGblBNCjA&utm_campaign=designshare&utm_medium=link&utm_source=editor">Pitch
                         deck</a>
-                    <a target="_blank" href="/">Demo</a>
+                    <a target="_blank" href="https://youtu.be/rDJPmtL1cfA">Demo</a>
                 </div>
 
                 <div class="page">

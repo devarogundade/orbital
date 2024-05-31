@@ -82,7 +82,7 @@ const getSwiper = (swiperInstance: SwiperType) => {
     <section>
       <div class="app_width">
         <div class="birth_container">
-          <a href="https://demo.myorbital.xyz" target="_blank" rel="noopener noreferrer">
+          <a href="https://youtu.be/rDJPmtL1cfA" target="_blank" rel="noopener noreferrer">
             <div class="birth">
               <img src="/images/birth.png" alt="" srcset="">
               <button>▶️ Watch Demo</button>
