@@ -11,3 +11,7 @@ We designed our cross-chain lending app to feel like a DEX that many blockchain 
 ## DEPLOYED AT
 
 https://myorbital.xyz
+
+## PICTH DECK
+
+https://www.canva.com/design/DAGGblBNCjA/EmcgD9-GhLpwln53hwpkmw/view?utm_content=DAGGblBNCjA&utm_campaign=designshare&utm_medium=link&utm_source=editor
