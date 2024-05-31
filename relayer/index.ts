@@ -64,11 +64,9 @@ const ON_REPAY_METHOD =
                     '6': BigInt(1) /* avalanche */
                 }
             },
+            spyEndpoint: process.env.SPY_HOST,
             redis: {
-                host: process.env.REDIS_HOST,
-                port: Number(process.env.REDIS_PORT),
-                password: "password",
-                username: "default"
+                host: process.env.REDIS_HOST
             }
         },
     );
@@ -215,6 +213,8 @@ const ON_REPAY_METHOD =
     }).listen(port);
 
     console.log(`[server]: Server running at http://${hostname}:${port}`);
+    console.log('spy', process.env.SPY_HOST);
+
 })();
 
 // SUI DEPS //
