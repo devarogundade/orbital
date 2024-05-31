@@ -684,6 +684,7 @@ onMounted(() => {
                     <td>Principal</td>
                     <td>Interest</td>
                     <td></td>
+                    <td></td>
                   </tr>
                 </thead>
                 <tbody>
@@ -740,6 +741,11 @@ onMounted(() => {
                     <td v-else>
                       <button>Processing...</button>
                     </td>
+                    <td>
+                      <a :href="`https://wormholescan.io/#/tx/${loan.fromHash}?network=TESTNET`" target="_blank">
+                        <img width="20px" src="/images/w.webp" alt="">
+                      </a>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -756,6 +762,7 @@ onMounted(() => {
                     <td>Collateral</td>
                     <td>Principal</td>
                     <td>Interest</td>
+                    <td></td>
                     <td></td>
                   </tr>
                 </thead>
@@ -800,6 +807,11 @@ onMounted(() => {
                     </td>
                     <td>
                       <button style="background: #d20808;" @click="deleteLoan(loan)">Delete</button>
+                    </td>
+                    <td>
+                      <a :href="`https://wormholescan.io/#/tx/${loan.fromHash}?network=TESTNET`" target="_blank">
+                        <img width="20px" src="/images/w.webp" alt="">
+                      </a>
                     </td>
                   </tr>
                 </tbody>
@@ -1116,6 +1128,10 @@ table td:nth-child(4) {
 
 table td:nth-child(5) {
   width: 120px;
+}
+
+table td:nth-child(6) {
+  width: 20px;
 }
 
 thead {
