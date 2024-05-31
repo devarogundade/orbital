@@ -4,6 +4,7 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { abi as ethAbi } from '../contracts/eth';
 import { config } from './config';
 import { getCoins } from './blockeden';
+import { convertToBigInt } from './erc20';
 
 export const defaultInterestRate = 45000;
 
@@ -44,7 +45,7 @@ export async function getAmountOut(
             abi: ethAbi,
             address: ORBITAL_AVAX,
             functionName: 'getAmountOut',
-            args: [tokenIn, tokenOut, amountIn, ltv]
+            args: [tokenIn, tokenOut, convertToBigInt(Number(amountIn)), ltv]
         }
         );
     } catch (error) {
@@ -66,7 +67,7 @@ export async function ethBorrow(
             abi: ethAbi,
             address: ORBITAL_AVAX,
             functionName: 'borrow',
-            args: [toChainId, tokenIn, tokenOut, value, receiver],
+            args: [toChainId, tokenIn, tokenOut, convertToBigInt(Number(value)), receiver],
             value: BigInt(0) // Wormhole fee.
         });
 

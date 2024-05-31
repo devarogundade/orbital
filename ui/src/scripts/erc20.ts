@@ -2,6 +2,24 @@ import { config } from './config';
 import { waitForTransactionReceipt, writeContract, readContract, getBalance } from '@wagmi/core';
 import { abi as erc20Abi } from "../contracts/erc20";
 
+export function convertToBigInt(num: number) {
+    // Check if the number is in scientific notation
+    if (num.toString().includes('e')) {
+        // Convert the number to a string in scientific notation
+        let [significand, exponent] = num.toExponential().split('e').map((str: any) => str.trim());
+
+        // Remove the decimal point from the significand
+        significand = significand.replace('.', '');
+
+        // Convert to BigInt
+        let bigIntResult = BigInt(significand) * BigInt(10) ** BigInt(exponent - (significand.length - 1));
+        return bigIntResult;
+    } else {
+        // If the number is not in scientific notation, directly convert it to BigInt
+        return BigInt(num);
+    }
+}
+
 export async function getTokenBalance(tokenId: `0x${string}`, address: `0x${string}`) {
     try {
         const { value } = await getBalance(config, { token: tokenId, address });
@@ -34,7 +52,7 @@ export async function approve(tokenId: `0x${string}`, spender: `0x${string}`, am
             abi: erc20Abi,
             address: tokenId,
             functionName: 'approve',
-            args: [spender, BigInt(amount)]
+            args: [spender, convertToBigInt(Number(amount))]
         });
 
         const receipt = await waitForTransactionReceipt(config, { hash: result });
