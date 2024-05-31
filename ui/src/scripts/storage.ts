@@ -5,13 +5,13 @@ import { doc, getFirestore, collection, query, where, getDocs, setDoc, deleteDoc
 const LOAN_COLLECTION: string = "loans";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDixnfsjPqg7xuzVGviGwnlhwjGP5b1TKo",
-    authDomain: "crossart-aea81.firebaseapp.com",
-    projectId: "crossart-aea81",
-    storageBucket: "crossart-aea81.appspot.com",
-    messagingSenderId: "284400004575",
-    appId: "1:284400004575:web:1cdbbc7edca95b96db286a",
-    measurementId: "G-V3Q83M7ECC"
+    apiKey: import.meta.env.VITE_FS_API_KEY,
+    authDomain: import.meta.env.VITE_FS_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FS_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FS_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FS_MSG_SENDER_ID,
+    appId: import.meta.env.VITE_FS_APP_ID,
+    measurementId: import.meta.env.VITE_FS_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
