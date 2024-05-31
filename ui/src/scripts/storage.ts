@@ -1,6 +1,6 @@
 import { LoanState, type Loan } from "@/types";
 import { initializeApp } from "firebase/app";
-import { doc, getFirestore, collection, query, where, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, getFirestore, collection, query, where, getDocs, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 const LOAN_COLLECTION: string = "loans";
 
@@ -19,6 +19,15 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
+
+export const listen = async (cb: () => void) => {
+    const loansRef = collection(db, LOAN_COLLECTION);
+
+    // Create a query against the collection.
+    const q = query(loansRef);
+
+    onSnapshot(q, () => { cb(); });
+};
 
 export const getAllLoans = async (suiAddress: string, ethAddress: string): Promise<Loan[]> => {
     try {

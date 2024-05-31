@@ -7,7 +7,7 @@ import Converter from '@/scripts/converter';
 import { useStore } from 'vuex';
 import { key } from '../store';
 import { LoanState, type Loan } from '@/types';
-import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan } from '@/scripts/storage';
+import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan, listen } from '@/scripts/storage';
 import { approve, getAllowance, getTokenBalance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
@@ -63,10 +63,7 @@ watch(
 const updateLoans = async () => {
   // update all loans.
   if (store.state.suiAddress && store.state.ethAddress) {
-    myLoans.value = await getAllLoans(
-      store.state.suiAddress,
-      store.state.ethAddress
-    );
+    myLoans.value = await getAllLoans(store.state.suiAddress, store.state.ethAddress);
   }
 };
 
@@ -138,7 +135,7 @@ const updateAmountOut = async () => {
   loan.value.amountOut = Number(Number(Converter.fromWei(amountOut)).toFixed(2));
 };
 
-const approveOrbital = async () => {
+const approveOrbital = async (borrowAfter: boolean = false) => {
   if (approving.value || !loan.value.amountIn) return;
   approving.value = true;
 
@@ -169,6 +166,10 @@ const approveOrbital = async () => {
   approving.value = false;
 
   updateAllowance();
+
+  if (borrowAfter) {
+    borrow();
+  }
 };
 
 const estimateInterest = (
@@ -264,13 +265,9 @@ const borrow = async () => {
       setTimeout(() => {
         // Refresh balances with bridging delay
         updateBalances();
-        updateLoans();
       }, 10_000);
 
       loan.value.amountIn = null;
-
-      // update all loans.
-      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -328,13 +325,9 @@ const borrow = async () => {
       setTimeout(() => {
         // Refresh balances with bridging delay
         updateBalances();
-        updateLoans();
       }, 10_000);
 
       loan.value.amountIn = null;
-
-      // update all loans.
-      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -365,8 +358,6 @@ const repay = async (loan: Loan) => {
       description: 'Please wait and try again.',
       category: 'error'
     });
-
-    updateLoans();
 
     return;
   }
@@ -416,10 +407,7 @@ const repay = async (loan: Loan) => {
       setTimeout(() => {
         // Refresh balances with bridging delay
         updateBalances();
-        updateLoans();
       }, 10_000);
-
-      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -436,13 +424,10 @@ const repay = async (loan: Loan) => {
     repaying.value = loan.loanId;
 
     const interest = estimateInterest(loan, true);
-    console.log('interest', interest);
 
     const coinOutValue = Number(
       Number(Converter.toGwei(loan.amountOut!)) + Number(interest)
     );
-
-    console.log('coinOutValue', coinOutValue);
 
     const hash = await suiRepay(
       loan.loanId,
@@ -466,10 +451,7 @@ const repay = async (loan: Loan) => {
       setTimeout(() => {
         // Refresh balances with bridging delay
         updateBalances();
-        updateLoans();
       }, 10_000);
-
-      updateLoans();
     } else {
       notify.push({
         title: 'Failed to send transaction.',
@@ -491,9 +473,6 @@ const deleteLoan = async (loan: Loan) => {
       description: 'Deleted loans cannot be recorved!.',
       category: 'error'
     });
-
-    // update all loans.
-    updateLoans();
   } else {
     notify.push({
       title: 'Failed to delete loan.',
@@ -524,6 +503,10 @@ watch(ethAddressState, () => {
 
 onMounted(() => {
   updateLoans();
+
+  listen(() => {
+    updateLoans();
+  });
 
   // Refresh balances
   updateBalances();
@@ -659,7 +642,7 @@ onMounted(() => {
             </div>
 
             <div class="action">
-              <button v-if="Number(allowance) < (loan.amountIn || 0)" @click="approveOrbital">
+              <button v-if="Number(allowance) < (loan.amountIn || 0)" @click="approveOrbital(true)">
                 {{ approving.valueOf() ? 'Approving..' : 'Approve' }}
               </button>
               <button @click="Number(allowance) >= (loan.amountIn || 0) ? borrow() : null" :style="{
@@ -739,7 +722,7 @@ onMounted(() => {
                       </button>
                     </td>
                     <td v-else>
-                      <button>Processing...</button>
+                      <button>...</button>
                     </td>
                     <td>
                       <a :href="`https://wormholescan.io/#/tx/${loan.fromHash}?network=TESTNET`" target="_blank">
