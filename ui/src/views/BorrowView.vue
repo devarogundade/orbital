@@ -471,7 +471,7 @@ const deleteLoan = async (loan: Loan) => {
     notify.push({
       title: 'Loan has been deleted.',
       description: 'Deleted loans cannot be recorved!.',
-      category: 'error'
+      category: 'success'
     });
   } else {
     notify.push({
