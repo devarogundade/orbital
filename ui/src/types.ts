@@ -29,3 +29,5 @@ export interface Message {
     linkTitle?: string;
     linkUrl?: string;
 }
+
+export type BorrowMode = 'simple' | 'advanced';

@@ -13,6 +13,7 @@ import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
 import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
 import InterChangeIcon from "@/components/icons/InterChangeIcon.vue";
+import SettingsIcon from "@/components/icons/SettingsIcon.vue";
 
 const emit = defineEmits(['close']);
 
@@ -486,6 +487,22 @@ const deleteLoan = async (loan: Loan) => {
   }
 };
 
+const switchMode = () => {
+  if (store.state.borrowMode == 'advanced') {
+    store.commit('setBorrowMode', 'simple');
+    return;
+  }
+  store.commit('setBorrowMode', 'advanced');
+};
+
+const comingSoon = () => {
+  notify.push({
+    title: 'Advanced mode coming soon.',
+    description: 'Switch to simple mode.',
+    category: 'error'
+  });
+};
+
 const suiAddressState = computed(() => store.state.suiAddress);
 const ethAddressState = computed(() => store.state.ethAddress);
 
@@ -521,14 +538,18 @@ onMounted(() => {
   <section>
     <div class="app_width">
       <div class="base_container">
-        <div class="borrow_container">
+        <div class="borrow_container" v-if="store.state.borrowMode == 'simple'">
           <div class="borrow">
             <div class="collateral">
               <div class="token_type">
                 <p>Asset Type:</p>
-                <div class="tabs">
-                  <button :class="loan.tokenType == 0 ? 'tab active' : 'tab'" @click="loan.tokenType = 0">Token</button>
-                  <button :class="'tab'" style="cursor: not-allowed;">NFT</button>
+                <div class="tabs_wrapper">
+                  <div class="tabs">
+                    <button :class="loan.tokenType == 0 ? 'tab active' : 'tab'"
+                      @click="loan.tokenType = 0">Token</button>
+                    <button :class="'tab'" style="cursor: not-allowed;">NFT</button>
+                  </div>
+                  <SettingsIcon @click="switchMode" />
                 </div>
               </div>
 
@@ -659,6 +680,93 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="advanced_container" v-if="store.state.borrowMode == 'advanced'">
+          <div class="supply">
+            <h3 class="title">Supply
+              <SettingsIcon @click="switchMode" />
+            </h3>
+            <table>
+              <thead>
+                <tr>
+                  <td>
+                    <div class="image">#</div>
+                  </td>
+                  <td>Asset</td>
+                  <td>Supplied</td>
+                  <td>Interest</td>
+                  <td></td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="image">
+                      <img src="/images/usdt.png" alt="">
+                    </div>
+                  </td>
+                  <td>Tether USD</td>
+                  <td>0.00 USDT</td>
+                  <td>2.5%</td>
+                  <td>
+                    <button @click="comingSoon">Supply</button>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody style="opacity: 0.5; cursor: not-allowed">
+                <tr>
+                  <td>
+                    <div class="image">
+                      <img src="/images/btc.png" alt="">
+                    </div>
+                  </td>
+                  <td>Bitcoin</td>
+                  <td>0.00 BTC</td>
+                  <td>6.2%</td>
+                  <td>
+                    <button>Supply</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <br> <br>
+
+          <div class="supply">
+            <h3 class="title">Borrow
+              <SettingsIcon @click="switchMode" />
+            </h3>
+            <table>
+              <thead>
+                <tr>
+                  <td>
+                    <div class="image">#</div>
+                  </td>
+                  <td>Asset</td>
+                  <td>Borrowed</td>
+                  <td>Interest</td>
+                  <td></td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="image">
+                      <img src="/images/fud.png" alt="">
+                    </div>
+                  </td>
+                  <td>Fud the Pug</td>
+                  <td>0.00 FUD</td>
+                  <td>4.5%</td>
+                  <td>
+                    <button @click="comingSoon">Borrow</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div style="display: flex; flex-direction: column; gap: 40px;">
           <div class="table_container">
             <h3>Open Loans ({{ myLoans.filter(ml => ml.state != LoanState.SETTLED).length }})</h3>
@@ -736,6 +844,10 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              <div class="empty" v-if="myLoans.filter(ml => ml.state != LoanState.SETTLED).length == 0">
+                <img src="/images/empty.png" alt="">
+                <p>No open loans.</p>
+              </div>
             </div>
           </div>
 
@@ -803,6 +915,10 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              <div class="empty" v-if="myLoans.filter(ml => ml.state == LoanState.SETTLED).length == 0">
+                <img src="/images/empty.png" alt="">
+                <p>No closed loans.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -820,6 +936,7 @@ section {
   display: flex;
   gap: 50px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .borrow_container {
@@ -827,6 +944,22 @@ section {
   align-items: center;
   flex-direction: column;
   gap: 5px;
+}
+
+.advanced_container {
+  width: 750px;
+}
+
+.advanced_container .title {
+  color: var(--tx-normal);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.advanced_container .title svg {
+  cursor: pointer;
 }
 
 .borrow {
@@ -862,6 +995,13 @@ section {
   font-size: 14px;
   font-weight: 500;
   color: var(--tx-dimmed);
+}
+
+.tabs_wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
 }
 
 .tabs {
@@ -1046,7 +1186,6 @@ input {
   color: var(--tx-dimmed);
 }
 
-
 .fee>p:last-child {
   margin-top: 8px;
   font-size: 14px;
@@ -1100,6 +1239,17 @@ table td:first-child {
   width: 40px;
 }
 
+table .image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+table img {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+}
 
 table td:nth-child(2) {
   width: 180px;
@@ -1198,5 +1348,25 @@ td button {
 
 tbody tr {
   height: 70px;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 500;
+  flex-direction: column;
+  color: var(--tx-dimmed);
+  gap: 10px;
+  text-align: center;
+  padding: 40px;
+  background: var(--background-light);
+  border-radius: 0 0 16px 16px;
+}
+
+.empty img {
+  height: 60px;
+  filter: brightness(50%);
 }
 </style>
