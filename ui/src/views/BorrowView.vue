@@ -591,6 +591,10 @@ onMounted(() => {
                         <img :src="token(loan.collateral)!.image" alt="">
                         <p>{{ token(loan.collateral)!.symbol }}</p>
                       </div>
+                      <div class="token" style="opacity: 0.5; cursor: not-allowed">
+                        <img src="/images/btc.png" alt="">
+                        <p>Bitcoin</p>
+                      </div>
                     </div>
                   </div>
                 </div>
