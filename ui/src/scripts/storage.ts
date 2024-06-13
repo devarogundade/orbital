@@ -1,8 +1,11 @@
 import { LoanState, type Loan } from "@/types";
 import { initializeApp } from "firebase/app";
-import { doc, getFirestore, collection, query, where, getDocs, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { doc, getFirestore, collection, query, where, getDocs, setDoc, deleteDoc, onSnapshot, getDoc } from "firebase/firestore";
 
 const LOAN_COLLECTION: string = "loans";
+const USERS_COLLECTION: string = "users";
+
+const PI: number = 3.141592654;
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FS_API_KEY,
@@ -78,6 +81,43 @@ export const setLoanAsSettled = async (fromHash: string) => {
     try {
         // Add a new document in collection "loans"
         await setDoc(doc(db, LOAN_COLLECTION, fromHash!), { state: LoanState.SETTLED },
+            { merge: true }
+        );
+    } catch (error) {
+        console.log(error);
+    }
+};
+
+export const getUserPoints = async (suiAddress: string) => {
+    try {
+        const result = await getDoc(doc(db, USERS_COLLECTION, suiAddress));
+        if (result.exists().valueOf()) {
+            const user = result.data();
+            return (user?.points || 0);
+        }
+    } catch (error) {
+        console.log(error);
+        return 0;
+    }
+};
+
+export const incrementPoints = async (suiAddress: string, worthUsd: number) => {
+    try {
+        const result = await getDoc(doc(db, USERS_COLLECTION, suiAddress));
+
+        const newPoints = (worthUsd * PI);
+        if (result.exists().valueOf()) {
+            const user = result.data();
+
+            // Add a new document in collection "loans"
+            await setDoc(doc(db, USERS_COLLECTION, suiAddress), { points: ((user?.points || 0) + newPoints) },
+                { merge: true }
+            );
+            return;
+        }
+
+        // Add a new document in collection "loans"
+        await setDoc(doc(db, USERS_COLLECTION, suiAddress), { points: newPoints },
             { merge: true }
         );
     } catch (error) {

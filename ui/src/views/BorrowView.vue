@@ -7,7 +7,7 @@ import Converter from '@/scripts/converter';
 import { useStore } from 'vuex';
 import { key } from '../store';
 import { LoanState, type Loan } from '@/types';
-import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan, listen } from '@/scripts/storage';
+import { getAllLoans, saveNewLoan, setLoanAsSettled, removeLoan, listen, incrementPoints } from '@/scripts/storage';
 import { approve, getAllowance, getTokenBalance } from '@/scripts/erc20';
 import { notify } from '@/reactives/notify';
 import { getCoinBalances } from "@/scripts/blockeden";
@@ -261,6 +261,7 @@ const borrow = async () => {
 
       // save a new loan.
       await saveNewLoan(loan.value);
+      await incrementPoints(store.state.suiAddress, loan.value.amountIn || 0);
 
       setTimeout(() => {
         // Refresh balances with bridging delay
@@ -321,6 +322,7 @@ const borrow = async () => {
 
       // save a new loan.
       await saveNewLoan(loan.value);
+      await incrementPoints(store.state.suiAddress, loan.value.amountIn || 0);
 
       setTimeout(() => {
         // Refresh balances with bridging delay
@@ -403,6 +405,7 @@ const repay = async (loan: Loan) => {
       });
 
       await setLoanAsSettled(loan.fromHash!);
+      await incrementPoints(store.state.suiAddress, loan.amountIn || 0);
 
       setTimeout(() => {
         // Refresh balances with bridging delay
@@ -447,6 +450,7 @@ const repay = async (loan: Loan) => {
       });
 
       await setLoanAsSettled(loan.fromHash!);
+      await incrementPoints(store.state.suiAddress, loan.amountIn || 0);
 
       setTimeout(() => {
         // Refresh balances with bridging delay

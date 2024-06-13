@@ -44,13 +44,13 @@ const Converter = {
     toMoney: function (amount: any, noComma = false, max: number | null = null) {
         let maxF = max ? max : 6;
         if (amount > 1) {
-            maxF = 3;
+            maxF = 4;
         }
         if (amount > 10) {
-            maxF = 2;
+            maxF = 3;
         }
         if (amount > 200) {
-            maxF = 0;
+            maxF = 2;
         }
         const formatter = new Intl.NumberFormat('en-US', {
             style: 'currency',

@@ -41,7 +41,7 @@ module orbital::price_feeds {
         state.price_ids.insert(coin_id, price_id);
     }
 
-    /// @notice
+    /// @notice Get coin price.
     public entry fun get_price<T>(
         oracle_holder: &OracleHolder,
         state: &mut State
@@ -56,7 +56,7 @@ module orbital::price_feeds {
         (price as u64)
     }
 
-    /// @notice
+    /// @notice Get coin amount relative to another coin amount.
     public fun estimate_from_to<X, Y>(
         oracle_holder: &OracleHolder,
         state: &mut State,

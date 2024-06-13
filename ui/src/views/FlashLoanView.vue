@@ -8,7 +8,7 @@ import ArrowDownIcon from "@/components/icons/ArrowDownIcon.vue";
       <div class="base_container">
         <div class="borrow_container">
           <div class="blur">
-            <p>Work In Progress.</p>
+            <p>Research In Progress.</p>
           </div>
 
           <div class="borrow">

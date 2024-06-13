@@ -16,6 +16,9 @@
                     <RouterLink to="/flash-loan">
                         <button :class="$route.name == 'flash-loan' ? 'tab active' : 'tab'">Flash Loan</button>
                     </RouterLink>
+                    <RouterLink to="/points">
+                        <button :class="$route.name == 'points' ? 'tab active' : 'tab'">Points ☄️</button>
+                    </RouterLink>
                 </div>
 
                 <div class="action">

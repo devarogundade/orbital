@@ -3,6 +3,7 @@ import HomeView from '@/views/HomeView.vue';
 import BorrowView from '@/views/BorrowView.vue';
 import FlashLoanView from '@/views/FlashLoanView.vue';
 import FaucetView from '@/views/FaucetView.vue';
+import PointsView from '@/views/PointsView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,6 +34,11 @@ const router = createRouter({
       path: '/faucet',
       name: 'faucet',
       component: FaucetView
+    },
+    {
+      path: '/points',
+      name: 'points',
+      component: PointsView
     }
   ]
 });

@@ -29,7 +29,7 @@ contract PriceFeeds is IPriceFeeds, Ownable2Step {
         _priceIds[tokenId.addressToBytes32()] = priceId;
     }
 
-    /// @notice
+    /// @notice Get token price.
     function getPrice(
         bytes32 tokenId
     ) external view override returns (uint256) {
@@ -39,7 +39,7 @@ contract PriceFeeds is IPriceFeeds, Ownable2Step {
         return data.price;
     }
 
-    /// @notice
+    /// @notice Get token amount relative to another token amount.
     function estimateFromTo(
         bytes32 tokenIn,
         bytes32 tokenOut,
