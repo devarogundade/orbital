@@ -611,10 +611,18 @@ onMounted(() => {
           <div class="borrow">
             <div class="principal">
               <div class="from_chain">
-                <p>Loan-To-Vlalue:</p>
+                <p>Loan-To-Value:</p>
                 <div class="chain">
                   <!-- <img src="/images/sui.png" alt=""> -->
                   <p>{{ LTV }}%</p>
+                </div>
+              </div>
+
+              <div class="from_chain">
+                <p>Interest:</p>
+                <div class="chain">
+                  <!-- <img src="/images/sui.png" alt=""> -->
+                  <p>4.5%</p>
                 </div>
               </div>
 

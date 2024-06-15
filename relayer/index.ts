@@ -1,6 +1,8 @@
 import * as dotenv from "dotenv";
 import Web3 from 'web3';
 
+const BLOCK_EDEN_KEY = "yoWczNougaeiUqV41Y96";
+
 import {
     Environment,
     StandardRelayerApp,
@@ -235,7 +237,8 @@ async function signOnBorrowTransactionOnSui(
     coinOutType: string,
     txHash: string
 ): Promise<string | null> {
-    const rpcUrl = getFullnodeUrl('testnet');
+    // const rpcUrl = getFullnodeUrl('testnet');
+    const rpcUrl = `https://api.blockeden.xyz/sui/testnet/${BLOCK_EDEN_KEY}`;
 
     const client = new SuiClient({ url: rpcUrl });
 
@@ -303,7 +306,8 @@ async function signOnRepayTransactionOnSui(
     loan: string,
     coinInType: string
 ): Promise<string | null> {
-    const rpcUrl = getFullnodeUrl('testnet');
+    // const rpcUrl = getFullnodeUrl('testnet');
+    const rpcUrl = `https://api.blockeden.xyz/sui/testnet/${BLOCK_EDEN_KEY}`;
 
     const client = new SuiClient({ url: rpcUrl });
 
